@@ -1,0 +1,29 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "compile",
+            "command": "g++",
+            "args": [
+                //"-D_DEBUG",
+                //"-O3",
+                // "-I",
+                // "${workspaceFolder}\\includes",
+                // "-L",
+                // "${workspaceFolder}\\lib",
+                // "-lfftw3-3",
+                // "-lfftw3f-3",
+                "-g",
+                "${fileDirname}\\LinearAlgebra.cpp",
+                "${file}",
+                "-o",
+                "${fileDirname}\\${fileBasenameNoExtension}.exe",
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": "build"
+        }
+    ]
+}

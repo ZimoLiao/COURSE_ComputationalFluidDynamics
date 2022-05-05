@@ -1,0 +1,202 @@
+\documentclass[11pt]{article}
+\usepackage{xeCJK}
+\usepackage{geometry}
+\usepackage{bm}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{subfigure}
+\usepackage{datetime}
+\usepackage{fontspec}
+\usepackage{fancyhdr}
+\usepackage{indentfirst}
+\usepackage{titlesec}
+\usepackage[round]{natbib}
+\usepackage{float}
+\usepackage{booktabs}
+
+% global style
+\geometry{b5paper,left=0.6in,right=0.6in,top=1in,bottom=0.8in}
+\linespread{1.3}
+\setlength{\parindent}{2em}
+
+\renewcommand{\today}{\small \number\year 年 \number\month 月 \number\day 日}
+\renewcommand{\abstractname}{\normalsize 摘\ \ 要}
+\renewcommand{\contentsname}{目录}
+\renewcommand{\refname}{参考文献}
+\renewcommand{\sectionmark}[1]{\markright{第\,\thesection\,章\, #1}}
+
+% title style
+\titleformat*{\section}{\Large\bfseries}
+\titleformat*{\subsection}{\large\bfseries}
+\titleformat*{\subsubsection}{\normalsize\bfseries}
+
+% font style
+\setCJKmainfont{SimSun}[BoldFont=SimHei, ItalicFont=KaiTi]
+\setmainfont{Times New Roman}[BoldFont=Arial]
+
+% page style
+\fancypagestyle{assignment}{
+    \fancyhf{}
+    \fancyfoot[C]{\thepage}
+    \fancyhead[L]{\small 廖紫默 (SA21005043)}
+    \fancyhead[C]{\small \textbf{计算流体力学}}
+    \fancyhead[R]{\small 2022年春}
+    \renewcommand{\headrulewidth}{0.4pt}
+    \renewcommand{\footrulewidth}{0.4pt}
+}
+\pagestyle{assignment}
+
+% ref style (in chinese)
+\def\equationautorefname{式}%
+\def\footnoteautorefname{脚注}%
+\def\itemautorefname{项}%
+\def\figureautorefname{图}%
+\def\figurename{图}
+\def\tableautorefname{表}%
+\def\tablename{表}
+\def\partautorefname{篇}%
+\def\appendixautorefname{附录}%
+\def\chapterautorefname{章}%
+\def\sectionautorefname{节}%
+\def\subsectionautorefname{小节}%
+\def\subsubsectionautorefname{subsubsection}%
+\def\paragraphautorefname{段落}%
+\def\subparagraphautorefname{子段落}%
+\def\FancyVerbLineautorefname{行}%
+\def\theoremautorefname{定理}%
+
+% header
+\title{\LARGE\textbf{计算流体力学 大作业}\\\Large\textbf{Poisson方程求解}}
+\author{\normalsize 廖紫默 (SA21005043)\\
+\small 近代力学系，中国科学技术大学\\
+\small \href{mailto:zimoliao@mail.ustc.edu.cn}{zimoliao@mail.ustc.edu.cn}}
+\date{\today}
+
+\begin{document}
+
+% titlepage
+\maketitle
+\thispagestyle{assignment}
+
+% part 2
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\section{问题简述}
+求解Poisson方程：
+\begin{equation}
+	\frac{\partial^2\phi}{\partial x^2}+\frac{\partial^2\phi}{\partial y^2}=\sin{x}\cos{y},\quad 0\leq x\leq1,\ 0\leq y\leq1\label{eqn:poisson}
+\end{equation}
+边界条件为：
+\begin{equation}
+	\phi=\left\{\begin{array}{ll}
+		0                          & ,x=0 \\
+		y-\frac{\sin{1}\cos{y}}{2} & ,x=1 \\
+		-\frac{\sin{x}}{2}         & ,y=0 \\
+		x-\frac{\sin{x}\cos{1}}{2} & ,y=1 \\
+	\end{array}\right.\label{eqn:bc}
+\end{equation}
+
+绘制等值线$\phi=0.05,\ 0.2,\ 0.5,\ 0.75,\ 1$。要求采用方法（迭代误差取$10^{-6}$）：
+\begin{enumerate}
+	\item 线性方程组求解：Jacobi，G-S选一；SOR，线SOR，块SOR选一。
+	\item 加速方法：CG，MG选一。
+\end{enumerate}
+
+\section{方程离散}
+采用有限差分方法离散\autoref{eqn:poisson}，空间二阶导项使用中心差分近似：
+\begin{equation}
+	\left(\frac{\partial^2\phi}{\partial x^2}\right)_i\approx\frac{\phi_{i+1}+\phi_{i-1}-2\phi_i}{\left(\Delta x\right)^2}
+\end{equation}
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=.2\linewidth]{figure/computational_molecular.png}
+	\caption{\label{fig:molecular}五点计算单元（computational molecular）\citep{ferziger_computational_2020}}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=.7\linewidth]{figure/algebra_equation_system.png}
+	\caption{\label{fig:algebra}代数方程组与带状系数矩阵形式\citep{ferziger_computational_2020}}
+\end{figure}
+
+原Poisson方程转化为一代数方程组，记为$\bm{A}\bm{\phi}=\bm{Q}$，其中系数矩阵$\bm{A}$为一带状矩阵，由五点计算单元构成，见\autoref{fig:molecular}、\autoref{fig:algebra}。各节点（$P$）上求解：
+\begin{equation}
+	A_W\phi_W+A_S\phi_S+A_P\phi_P+A_N\phi_N+A_E\phi_E=Q_P
+\end{equation}
+采用二阶中心差分的Poisson方程系数为：
+\begin{equation}
+	A_W=A_S=A_N=A_E=1,\quad A_P=-4
+\end{equation}
+此外，非齐次项由$Q_P=h^2\sin(x_P)\cos(y_P)$确定，$h=\Delta x=\Delta y$为均匀网格间距。边界条件（\autoref{eqn:bc}）采用直接转移法施加到代数方程组中。
+
+\section{代数方程组求解}
+\subsection{迭代解法}
+线性代数方程组迭代方法的基本思路在于将原始方程：
+\begin{equation}
+	\bm{A}\bm{\phi}=\bm{Q}
+\end{equation}
+中系数矩阵拆分$\bm{A}=\bm{M}-\bm{N}$，进而构造迭代方程\footnote{更一般的形式为：$\bm{M}\bm{\phi}^{n+1}=\bm{N}\bm{\phi}^n+\bm{B},\ \bm{PA}=\bm{M-N},\ \bm{B}=\bm{PQ}$。}：
+\begin{equation}
+	\bm{M}\bm{\phi}^{n+1}=\bm{N}\bm{\phi}^n+\bm{Q}
+\end{equation}
+当$\bm{M}^{-1}\bm{N}$的谱半径小于1时，上述迭代式可以收敛到原方程的解。构造不同的$\bm{M}$、$\bm{N}$矩阵可以得到性能相异的迭代方法。
+
+\subsection{Jacobi方法（J）}
+记$\bm{A}=\bm{L+D+U}$，分别表示下三角、对角、上三角部分，Jacobi方法直接取$\bm{M}=\bm{D}$。迭代方程如下\cite{sauer_numerical_2018}：
+\begin{equation}
+	\bm{\phi}^{n+1}=\bm{D}^{-1}\left(\bm{Q}-\left(\bm{L+U}\right)\bm{\phi}^n\right)
+\end{equation}
+
+对于离散Poisson方程（具有带状系数矩阵），迭代式可写为：
+\begin{equation}
+	\phi_P^{n+1}=-\frac{Q_P-\phi_S^n-\phi_W^n-\phi_N^n-\phi_E^n}{4}
+\end{equation}
+
+\subsection{Gauss-Seidel方法（GS）}
+Gauss-Seidel方法的思路在于将迭代更新的$\phi^{n+1}$立即用于此后各点的计算中，迭代方程如下：
+\begin{equation}
+	\bm{\phi}^{n+1}=\bm{D}^{-1}\left(\bm{Q}-\bm{U}\bm{\phi}^n-\bm{L}\bm{\phi}^{n+1}\right)
+\end{equation}
+
+对于离散Poisson方程，迭代式可写为：
+\begin{equation}
+	\phi_P^{n+1}=-\frac{Q_P-\phi_S^{n+1}-\phi_W^{n+1}-\phi_N^n-\phi_E^n}{4}
+\end{equation}
+事实上G-S方法可以看作下文SOR方法的一个特例。
+
+\subsection{逐次超松弛方法（SOR）}
+逐次超松弛方法在G-S方法的基础上引入超松弛系数$\omega>1$，进而显著加速迭代过程，如下所示：
+\begin{equation}
+	\phi_P^{n+1}=\omega\phi_P^{n+1,G-S}+(1-\omega)\phi_P^n
+\end{equation}
+当$\omega=1$时退化为G-S方法，通常在$1.6\leq\omega\leq1.9$时有很好的加速效果，而在$\omega=2$时迭代发散。常规SOR方法（含G-S）的一大缺陷在于其每步迭代中各点的值存在依赖性，继而难以实现算法并行化。
+
+\subsection{线SOR方法（LSOR）}
+前述方法均为显式迭代方法，考虑到三对角矩阵直接求解具有极高的效率（见\autoref{ch:tdma}），线SOR方法在单步迭代中，逐行（列）构造三对角矩阵隐式求解，进而实现加速。以行SOR（记为LSOR-X）为例，即在SOR迭代式中用$\phi_E^{n+1}$替代$\phi_E^n$：
+\begin{equation}
+	\phi_P^{n+1}=\omega\left(-\frac{Q_P-\phi_S^{n+1}-\phi_W^{n+1}-\phi_N^n-\phi_E^{n+1}}{4}\right)+(1-\omega)\phi_P^n
+\end{equation}
+\begin{equation}
+	-\frac{\omega}{4}\phi_W^{n+1}+\phi_P^{n+1}-\frac{\omega}{4}\phi_E^{n+1}=\omega\frac{\phi_S^{n+1}-Q_P}{4}+(1-\omega)\phi_P^n
+\end{equation}
+其中$\phi_S^{n+1}$为前一行已经计算得到的值，即右端项均已知，得到当前行上的代数方程组，其系数矩阵为三对角矩阵，可以采用TDMA直接求解。列SOR（LSOR-Y）同理，单个迭代步内逐列求解。
+
+\subsection{块SOR方法（LSOR-ADI）}
+
+\subsection{三对角矩阵直接解法（TDMA）\label{ch:tdma}}
+
+\subsection{不完全LU分解方法（strongly implicit procedure, SIP）}
+
+\section{加速方法}
+\subsection{共轭梯度法（CG）}
+
+\subsection{多重网格法（MG）}
+
+\newpage
+\bibliographystyle{unsrtnat}
+\bibliography{ref}
+
+\end{document}
