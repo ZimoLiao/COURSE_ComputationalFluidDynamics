@@ -16,7 +16,7 @@
                 // "-lfftw3f-3",
                 "-g",
                 // "${fileDirname}\\ExactRiemannSolver.cpp",
-                "${fileDirname}\\FluxVectorSplitting.cpp",
+                // "${fileDirname}\\FluxVectorSplitting.cpp",
                 // "${fileDirname}\\ExactRiemannSolver.cpp",
                 "${file}",
                 "-o",
