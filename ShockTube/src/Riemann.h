@@ -2,9 +2,11 @@
 #define RIEMANN_H_
 
 #include <math.h>
+#include <algorithm>
 
 using std::max;
 
+// Riemann problem (1D Euler equaiton)
 struct Riemann
 {
     /* constants */
@@ -27,41 +29,33 @@ struct Riemann
 
     /* functions */
     // init left/right primitive variables
-    bool Init(double dL, double uL, double pL, double dR, double uR, double pR);
+    bool Init(double dL, double uL, double pL, double dR, double uR, double pR)
+    {
+        this->dL = dL;
+        this->uL = uL;
+        this->pL = pL;
+        this->dR = dR;
+        this->uR = uR;
+        this->pR = pR;
+
+        cL = sqrt(gamma * pL / dL);
+        cR = sqrt(gamma * pR / dR);
+
+        return CheckPressurePositivity();
+    }
 
     // pressure positivity consition
-    bool CheckPressurePositivity();
+    bool CheckPressurePositivity()
+    {
+        return g4 * (cL + cR) >= (uR - uL);
+    }
 
     // guess value of pressure in star-region (p_PV)
-    double GuessPressureStar();
+    double GuessPressureStar()
+    {
+        double pPV = 0.5 * (pL + pR) - 0.125 * (uR - uL) * (dL + dR) * (cL + cR);
+        return max(tol, pPV);
+    }
 };
-
-/* Riemann */
-
-bool Riemann::Init(double dL, double uL, double pL, double dR, double uR, double pR)
-{
-    this->dL = dL;
-    this->uL = uL;
-    this->pL = pL;
-    this->dR = dR;
-    this->uR = uR;
-    this->pR = pR;
-
-    cL = sqrt(gamma * pL / dL);
-    cR = sqrt(gamma * pR / dR);
-
-    return CheckPressurePositivity();
-}
-
-bool Riemann::CheckPressurePositivity()
-{
-    return g4 * (cL + cR) >= (uR - uL);
-}
-
-double Riemann::GuessPressureStar()
-{
-    double pPV = 0.5 * (pL + pR) - 0.125 * (uR - uL) * (dL + dR) * (cL + cR);
-    return max(tol, pPV);
-}
 
 #endif

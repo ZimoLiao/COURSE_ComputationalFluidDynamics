@@ -3,7 +3,7 @@
 
 using std::ofstream;
 
-constexpr int n = 100;
+constexpr int n = 200;
 
 int main()
 {
