@@ -15,7 +15,7 @@
                 // "-lfftw3-3",
                 // "-lfftw3f-3",
                 "-g",
-                "${fileDirname}\\LinearAlgebra.cpp",
+                // "${fileDirname}\\LinearAlgebra.cpp",
                 "${file}",
                 "-o",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe",
