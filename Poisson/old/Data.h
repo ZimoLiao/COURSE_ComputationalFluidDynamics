@@ -10,7 +10,7 @@ using std::cout;
 using std::ofstream;
 using std::string;
 
-// index calculation (colume-major)
+// index calculation (column-major)
 inline int Index(int i, int j, int num)
 {
     return (num + 1) * j + i;

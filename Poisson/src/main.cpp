@@ -1,148 +1,41 @@
-#include "Poisson.h"
+#include "Grid.h"
 
-constexpr double pi = 3.14159265358979;
+constexpr int NCELL = 100;
 
 int main()
 {
-    int num = 256;
-    double omega = 1.0;
+    Info info;
+    info.error = 1e-6;
 
-    Grid jacobi(num), gs(num), sor(num), lgs(num);
-    Rhs rhs(num);
+    Grid phi(NCELL), rhs, res(NCELL);
 
-    // PoissonJ(jacobi, rhs, 10000, 1e-6);
-    // jacobi.WriteAscii("Jacobi.plt");
+    rhs.InitPoissonRhs(NCELL);
 
-    clock_t start = clock(), end;
-    PoissonGS(gs, rhs, 10000, 1e-6);
-    end = clock();
-    double gstime = double(end - start) / CLOCKS_PER_SEC;
-    gs.WriteAscii("GS.plt");
+    /* G-S method */
+    phi.Flush();
+    res.Flush();
+    info.Reset();
 
-    // omega = 2 / (1 + sin(pi / num));
-    // PoissonSOR(sor, rhs, 10000, 1e-6, omega);
-    // sor.WriteAscii("SOR.plt");
+    phi.SolvePoissonGS(rhs, info);
+    phi.Write("GS-sol.plt", "phi");
 
-    // PoissonLGSY(lgs, rhs, 10000, 1e-6);
-    // lgs.WriteAscii("LGSY.plt");
+    res.InitPoissonRes(phi, rhs);
+    res.Write("GS-res.plt", "phi_res");
 
-    /* Multi-grid test */
-    cout << "\nMulti-grid test\n";
+    info.Print("GS");
+    info.Write("GS-info.plt");
 
-    // TODO: test 1
-    // Grid coarse(num / 2), fine(num);
+    /* Multi-grid G-S method */
+    phi.Flush();
+    res.Flush();
+    info.Reset();
 
-    // coarse.MGrestriction(sor);
-    // coarse.WriteAscii("SOR_coarse.plt");
+    phi.SolvePoissonMGGS(rhs, 2, 3, 3, info);
+    phi.Write("MG-GS-sol.plt", "phi");
 
-    // fine.MGinterpolation(coarse);
-    // fine.WriteAscii("SOR_fine.plt");
+    res.InitPoissonRes(phi, rhs);
+    res.Write("MG-GS-res.plt", "phi_res");
 
-    // TODO: test 2
-    // Grid fine(num), coarse(num / 2);
-    // PoissonGS(fine, rhs, 500, 1e-4);
-    // fine.WriteAscii("MG-GS-approximation.plt");
-
-    // rhs.Residual(fine);
-    // Rhs rhsf(rhs);
-    // Rhs rhs_coarse(num / 2);
-    // rhs_coarse.MGrestriction(rhs);
-
-    // PoissonGS(coarse, rhs_coarse, 500, 1e-8);
-
-    // Grid rec(num);
-    // rec.MGinterpolation(coarse);
-
-    // PoissonGS(rec, rhsf, 500, 1e-6);
-    // rec.WriteAscii("correction.plt");
-
-    // fine += rec;
-    // fine.WriteAscii("MG-GS-solution.plt");
-
-    Grid mggs(num);
-
-    start = clock();
-    cout << "cycle\n\n";
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    cout << "cycle\n\n";
-    rhs.Init(num);
-    PoissonMG_GS(mggs, rhs, 10, 10, 1e-6);
-    end = clock();
-    double mggstime = double(end - start) / CLOCKS_PER_SEC;
-
-    mggs.WriteAscii("MG-GS.plt");
-
-    cout << "\nGS time: " << gstime << "\nMG-GS time: " << mggstime << '\n';
+    info.Print("MG-GS");
+    info.Write("MG-GS-info.plt");
 }
