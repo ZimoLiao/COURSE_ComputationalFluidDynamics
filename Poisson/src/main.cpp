@@ -1,6 +1,6 @@
 #include "Grid.h"
 
-constexpr int NCELL = 100;
+constexpr int NCELL = 128;
 
 int main()
 {
@@ -30,7 +30,7 @@ int main()
     res.Flush();
     info.Reset();
 
-    phi.SolvePoissonMGGS(rhs, 2, 3, 3, info);
+    phi.SolvePoissonMGGS(rhs, 4, 2, 2, info);
     phi.Write("MG-GS-sol.plt", "phi");
 
     res.InitPoissonRes(phi, rhs);

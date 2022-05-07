@@ -9,6 +9,7 @@
 
 using std::cout;
 using std::endl;
+using std::find;
 using std::max;
 using std::ofstream;
 using std::string;
@@ -20,6 +21,7 @@ struct Info
 {
     /* data */
     double time = 0.0, error = 1e-6;
+    double timeN[10] = {0.0};
     int step = 0;
 
     double iterErrorN2[STEPMAX], iterErrorNinf[STEPMAX];
@@ -48,9 +50,20 @@ struct Info
 
     void Print(string method)
     {
-        cout << "Method: " << method << '\n'
-             << "step = " << step << '\n'
-             << "time = " << time << "\n\n";
+        if (method.find("MG") == string::npos)
+        {
+            cout << "Method: " << method << '\n'
+                 << "step               = " << step << '\n'
+                 << "time               = " << time << "\n\n";
+        }
+        else
+        {
+            cout << "Method: " << method << '\n'
+                 << "step               = " << step << '\n'
+                 << "time (iteration)   = " << time << '\n'
+                 << "time (others)      = " << timeN[0] - time << '\n'
+                 << "time (total)       = " << timeN[0] << "\n\n";
+        }
     }
 
     void Write(string fileName)
@@ -73,14 +86,26 @@ struct Info
         start = clock();
     }
 
+    void Start(int n)
+    {
+        startN[n] = clock();
+    }
+
     void End()
     {
         end = clock();
         time += double(end - start) / CLOCKS_PER_SEC;
     }
 
+    void End(int n)
+    {
+        endN[n] = clock();
+        timeN[n] += double(endN[n] - startN[n]) / CLOCKS_PER_SEC;
+    }
+
 private:
     clock_t start, end;
+    clock_t startN[10], endN[10];
 };
 
 /* finite difference discretized 2D-uniform-square grid (with width = 1)
@@ -328,7 +353,7 @@ void Grid::InitPoissonRes(Grid &obj)
             indS = Index(i, j - 1);
             indN = Index(i, j + 1);
 
-            data[indP] = -(obj.data[indW] + obj.data[indE] + obj.data[indS] + obj.data[indN] - 4.0 * obj.data[indP]);
+            data[indP] -= -(obj.data[indW] + obj.data[indE] + obj.data[indS] + obj.data[indN] - 4.0 * obj.data[indP]);
         }
     }
 }
@@ -514,7 +539,7 @@ void Grid::SolvePoissonGS(Grid &rhs, int stepmax, Info &info)
 
 void Grid::SolvePoissonMGGS(Grid &rhs, int level, int n1, int n2, Info &info)
 {
-    if (nCell % int(pow(2, level - 1)) || level > 4 || level < 2)
+    if (nCell % int(pow(2, level - 1)) || level < 2)
     {
         cout << "WRONG\n";
     }
@@ -531,7 +556,7 @@ void Grid::SolvePoissonMGGS(Grid &rhs, int level, int n1, int n2, Info &info)
             res_c.Init(nCell / 2);
 
             // iteration
-            info.Start();
+            info.Start(0);
 
             double error = 1.0, errorCrit = info.error;
             int step = 0;
@@ -561,13 +586,16 @@ void Grid::SolvePoissonMGGS(Grid &rhs, int level, int n1, int n2, Info &info)
                 error = info.iterErrorN2[info.step];
             }
 
-            info.End();
+            info.End(0);
         }
         break;
 
-        case 3:
+        default:
         {
-            Grid phiDown[3], phiUp[3], res[3];
+            Grid *phiDown = new Grid[level],
+                 *phiUp = new Grid[level],
+                 *res = new Grid[level];
+
             for (int l = 0; l < level; l++)
             {
                 phiDown[l].Init(nCell / pow(2, l));
@@ -576,16 +604,17 @@ void Grid::SolvePoissonMGGS(Grid &rhs, int level, int n1, int n2, Info &info)
             }
 
             // iteration
-            info.Start();
+            info.Start(0); // total
 
             double error = 1.0, errorCrit = info.error;
             int step = 0;
+
             while (step < STEPMAX && error > errorCrit)
             {
                 step++;
                 error = 0.0;
 
-                // V-cicle
+                // V-cycle
                 SolvePoissonGS(rhs, n1, info);
 
                 res[0].InitPoissonRes(*this, rhs);
@@ -594,31 +623,36 @@ void Grid::SolvePoissonMGGS(Grid &rhs, int level, int n1, int n2, Info &info)
                 phiDown[1].Flush();
                 phiDown[1].SolvePoissonGS(res[1], n1, info);
 
-                res[1].InitPoissonRes(phiDown[1]);
-                res[2] = res[1];
+                // down
+                for (int m = 2; m < level; m++)
+                {
+                    res[m - 1].InitPoissonRes(phiDown[m - 1]);
+                    res[m] = res[m - 1]; // restriction
+                    phiDown[m].Flush();
+                    phiDown[m].SolvePoissonGS(res[m], n1, info);
+                }
 
-                phiDown[2].Flush();
-                phiDown[2].SolvePoissonGS(res[2], n1 + n2, info);
-
-                phiUp[1] = phiDown[2];
-                phiDown[1] += phiUp[1];
+                // up
+                for (int m = level - 1; m > 1; m--)
+                {
+                    phiDown[m].SolvePoissonGS(res[m], n2, info);
+                    phiUp[m - 1] = phiDown[m]; // interpolation
+                    phiDown[m - 1] += phiUp[m - 1];
+                }
 
                 phiDown[1].SolvePoissonGS(res[1], n2, info);
-
                 phiUp[0] = phiDown[1];
                 this->operator+=(phiUp[0]);
 
                 SolvePoissonGS(rhs, n2, info);
 
+                // iteration error in fine grid
                 error = info.iterErrorN2[info.step];
             }
 
-            info.End();
+            info.End(0);
         }
         break;
-
-        default:
-            break;
         }
     }
 }
