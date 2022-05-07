@@ -25,6 +25,21 @@ int main()
     info.Print("GS");
     info.Write("GS-info.plt");
 
+    /* SOR method */
+    phi.Flush();
+    res.Flush();
+    info.Reset();
+
+    double omega = 1.5;
+    phi.SolvePoissonSOR(rhs, omega, info);
+    phi.Write("SOR-sol.plt", "phi");
+
+    res.InitPoissonRes(phi, rhs);
+    res.Write("SOR-res.plt", "phi_res");
+
+    info.Print("SOR");
+    info.Write("SOR-info.plt");
+
     /* Multi-grid G-S method */
     phi.Flush();
     res.Flush();
@@ -38,4 +53,18 @@ int main()
 
     info.Print("MG-GS");
     info.Write("MG-GS-info.plt");
+
+    /* Multi-grid SOR method */
+    phi.Flush();
+    res.Flush();
+    info.Reset();
+
+    phi.SolvePoissonMGSOR(rhs, omega, 4, 2, 2, info);
+    phi.Write("MG-SOR-sol.plt", "phi");
+
+    res.InitPoissonRes(phi, rhs);
+    res.Write("MG-SOR-res.plt", "phi_res");
+
+    info.Print("MG-SOR");
+    info.Write("MG-SOR-info.plt");
 }
