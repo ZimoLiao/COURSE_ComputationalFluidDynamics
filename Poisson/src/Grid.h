@@ -132,8 +132,7 @@ struct Grid
     ~Grid();
 
 protected:
-    // column-major ordered
-    // (i, j) in [1:(nCell-1), 1:(nCell-1)]
+    // column-major ordered; (i, j) in [1:(nCell-1), 1:(nCell-1)]
     inline int Index(int i, int j);
 
     // pointer
@@ -167,6 +166,10 @@ public:
     void operator+=(Grid &obj);
 
     /* solvers */
+    // Jacobi method
+    void SolvePoissonJacobi(Grid &rhs, Info &info);
+    void SolvePoissonJacobi(Grid &rhs, int stepmax, Info &info);
+
     // Gauss–Seidel method
     void SolvePoissonGS(Grid &rhs, Info &info);
     void SolvePoissonGS(Grid &rhs, int stepmax, Info &info);
@@ -176,6 +179,7 @@ public:
     void SolvePoissonSOR(Grid &rhs, double omega, int stepmax, Info &info);
 
     // Multi-grid accelerated Gauss–Seidel method
+    void SolvePoissonMGJ(Grid &rhs, int level, int n1, int n2, Info &info);
     void SolvePoissonMGGS(Grid &rhs, int level, int n1, int n2, Info &info);
     void SolvePoissonMGSOR(Grid &rhs, double omega, int level, int n1, int n2, Info &info);
 };
@@ -470,6 +474,115 @@ void Grid::operator+=(Grid &obj)
 }
 
 /* solvers */
+
+void Grid::SolvePoissonJacobi(Grid &rhs, Info &info)
+{
+    // iteration
+    info.Start();
+
+    // temporary data
+    double *datan = new double[nSize];
+    for (int ind = 0; ind < nSize; ind++)
+    {
+        datan[ind] = data[ind];
+    }
+
+    double error = 1.0, errorCrit = info.error;
+    int step = 0;
+    while (step < STEPMAX && error > errorCrit)
+    {
+        info.step++;
+        step++;
+        error = 0.0;
+
+        int indP, indW, indE, indS, indN;
+        for (int j = 1; j < nCell; j++)
+        {
+            for (int i = 1; i < nCell; i++)
+            {
+                indP = Index(i, j);
+                indW = Index(i - 1, j);
+                indE = Index(i + 1, j);
+                indS = Index(i, j - 1);
+                indN = Index(i, j + 1);
+
+                double phi = (-rhs.data[indP] + data[indS] + data[indW] + data[indN] + data[indE]) / 4.0;
+
+                error += pow(phi - data[indP], 2.0);
+                // info.iterErrorNinf[info.step] = max(info.iterErrorNinf[info.step], fabs(phi - data[indP]));
+
+                datan[indP] = phi;
+            }
+        }
+
+        for (int ind = 0; ind < nSize; ind++)
+        {
+            data[ind] = datan[ind];
+        }
+
+        info.iterErrorN2[info.step] = error;
+        // error = info.iterErrorNinf[info.step];
+    }
+
+    delete[] datan;
+
+    info.End();
+}
+
+void Grid::SolvePoissonJacobi(Grid &rhs, int stepmax, Info &info)
+{
+    // iteration
+    info.Start();
+
+    // temporary data
+    double *datan = new double[nSize];
+    for (int ind = 0; ind < nSize; ind++)
+    {
+        datan[ind] = data[ind];
+    }
+
+    double error = 1.0;
+    int step = 0;
+    while (step < stepmax)
+    {
+        info.step++;
+        step++;
+        error = 0.0;
+
+        int indP, indW, indE, indS, indN;
+        for (int j = 1; j < nCell; j++)
+        {
+            for (int i = 1; i < nCell; i++)
+            {
+                indP = Index(i, j);
+                indW = Index(i - 1, j);
+                indE = Index(i + 1, j);
+                indS = Index(i, j - 1);
+                indN = Index(i, j + 1);
+
+                double phi = (-rhs.data[indP] + data[indS] + data[indW] + data[indN] + data[indE]) / 4.0;
+
+                error += pow(phi - data[indP], 2.0);
+                // info.iterErrorNinf[info.step] = max(info.iterErrorNinf[info.step], fabs(phi - data[indP]));
+
+                datan[indP] = phi;
+            }
+        }
+
+        for (int ind = 0; ind < nSize; ind++)
+        {
+            data[ind] = datan[ind];
+        }
+
+        info.iterErrorN2[info.step] = error;
+        // error = info.iterErrorNinf[info.step];
+    }
+
+    delete[] datan;
+
+    info.End();
+}
+
 void Grid::SolvePoissonGS(Grid &rhs, Info &info)
 {
     // iteration

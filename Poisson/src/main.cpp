@@ -11,6 +11,20 @@ int main()
 
     rhs.InitPoissonRhs(NCELL);
 
+    /* Jacobi method */
+    phi.Flush();
+    res.Flush();
+    info.Reset();
+
+    phi.SolvePoissonJacobi(rhs, info);
+    phi.Write("Jacobi-sol.plt", "phi");
+
+    res.InitPoissonRes(phi, rhs);
+    res.Write("Jacobi-res.plt", "phi_res");
+
+    info.Print("Jacobi");
+    info.Write("Jacobi-info.plt");
+
     /* G-S method */
     phi.Flush();
     res.Flush();
