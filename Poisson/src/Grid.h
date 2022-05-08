@@ -147,6 +147,11 @@ protected:
     inline bool atN();
     inline bool atBoundary();
 
+    // direct solvers
+    // Thomas algorithm (TDMA) for identical coefficients
+    void SolveThomas(int n, double W, double P, double E, double *B, double *x, double &error);
+    void SolveThomas(int n, double W, double *p, double E, double *b, double *x, double &error);
+
 public:
     /* functions */
     void Flush();
@@ -175,7 +180,9 @@ public:
     void SolvePoissonGS(Grid &rhs, int stepmax, Info &info);
 
     // Successive over-relaxation (SOR) method
+    void SolvePoissonSOR(Grid &rhs, Info &info); // default omega
     void SolvePoissonSOR(Grid &rhs, double omega, Info &info);
+    void SolvePoissonSOR(Grid &rhs, int stepmax, Info &info); // default omega
     void SolvePoissonSOR(Grid &rhs, double omega, int stepmax, Info &info);
 
     // Line Gauss-Seidel method (column)
@@ -184,6 +191,7 @@ public:
     // Multi-grid accelerated Gauss–Seidel method
     void SolvePoissonMGJ(Grid &rhs, int level, int n1, int n2, Info &info);
     void SolvePoissonMGGS(Grid &rhs, int level, int n1, int n2, Info &info);
+    void SolvePoissonMGSOR(Grid &rhs, int level, int n1, int n2, Info &info); // default omega
     void SolvePoissonMGSOR(Grid &rhs, double omega, int level, int n1, int n2, Info &info);
 };
 
@@ -252,6 +260,55 @@ inline bool Grid::atN()
 inline bool Grid::atBoundary()
 {
     return (atW() || atE() || atS() || atN());
+}
+
+// internal matrix solvers
+void Grid::SolveThomas(int n, double W, double P, double E, double *B, double *x, double &error)
+{
+    double *p = new double[n], *b = new double[n];
+    for (int i = 0; i < n; i++)
+    {
+        p[i] = P;
+        b[i] = B[i];
+    }
+
+    // elimination
+    for (int i = 1; i < n; i++)
+    {
+        p[i] = 1.0 - W * E / p[i - 1];
+        b[i] -= W * b[i - 1] / p[i - 1];
+    }
+
+    // back substitution
+    x[n - 1] = b[n - 1] / p[n - 1];
+    for (int i = n - 2; i >= 0; i--)
+    {
+        double xn = (b[i] - E * x[i + 1]) / p[i];
+        error += pow(xn - x[i], 2.0);
+        x[i] = xn;
+    }
+
+    delete[] p;
+    delete[] b;
+}
+
+void Grid::SolveThomas(int n, double W, double *p, double E, double *b, double *x, double &error)
+{
+    // elimination
+    for (int i = 1; i < n; i++)
+    {
+        p[i] = 1.0 - W * E / p[i - 1];
+        b[i] -= W * b[i - 1] / p[i - 1];
+    }
+
+    // back substitution
+    x[n - 1] = b[n - 1] / p[n - 1];
+    for (int i = n - 2; i >= 0; i--)
+    {
+        double xn = (b[i] - E * x[i + 1]) / p[i];
+        error += pow(xn - x[i], 2.0);
+        x[i] = xn;
+    }
 }
 
 /* functions */
@@ -664,6 +721,49 @@ void Grid::SolvePoissonGS(Grid &rhs, int stepmax, Info &info)
     info.End();
 }
 
+void Grid::SolvePoissonSOR(Grid &rhs, Info &info)
+{
+    // iteration
+    info.Start();
+
+    double omega = 2.0 / (1 + sin(3.14159265358979 / rhs.nCell)),
+           omegac = 1.0 - omega;
+
+    double error = 1.0, errorCrit = info.error;
+    int step = 0;
+    while (step < STEPMAX && error > errorCrit)
+    {
+        info.step++;
+        step++;
+        error = 0.0;
+
+        int indP, indW, indE, indS, indN;
+        for (int j = 1; j < nCell; j++)
+        {
+            for (int i = 1; i < nCell; i++)
+            {
+                indP = Index(i, j);
+                indW = Index(i - 1, j);
+                indE = Index(i + 1, j);
+                indS = Index(i, j - 1);
+                indN = Index(i, j + 1);
+
+                double phi = (-rhs.data[indP] + data[indS] + data[indW] + data[indN] + data[indE]) / 4.0;
+
+                error += pow(phi - data[indP], 2.0);
+                // info.iterErrorNinf[info.step] = max(info.iterErrorNinf[info.step], fabs(phi - data[indP]));
+
+                data[indP] *= omegac;
+                data[indP] += phi * omega;
+            }
+        }
+        info.iterErrorN2[info.step] = error;
+        // error = info.iterErrorNinf[info.step];
+    }
+
+    info.End();
+}
+
 void Grid::SolvePoissonSOR(Grid &rhs, double omega, Info &info)
 {
     // iteration
@@ -674,6 +774,49 @@ void Grid::SolvePoissonSOR(Grid &rhs, double omega, Info &info)
     double error = 1.0, errorCrit = info.error;
     int step = 0;
     while (step < STEPMAX && error > errorCrit)
+    {
+        info.step++;
+        step++;
+        error = 0.0;
+
+        int indP, indW, indE, indS, indN;
+        for (int j = 1; j < nCell; j++)
+        {
+            for (int i = 1; i < nCell; i++)
+            {
+                indP = Index(i, j);
+                indW = Index(i - 1, j);
+                indE = Index(i + 1, j);
+                indS = Index(i, j - 1);
+                indN = Index(i, j + 1);
+
+                double phi = (-rhs.data[indP] + data[indS] + data[indW] + data[indN] + data[indE]) / 4.0;
+
+                error += pow(phi - data[indP], 2.0);
+                // info.iterErrorNinf[info.step] = max(info.iterErrorNinf[info.step], fabs(phi - data[indP]));
+
+                data[indP] *= omegac;
+                data[indP] += phi * omega;
+            }
+        }
+        info.iterErrorN2[info.step] = error;
+        // error = info.iterErrorNinf[info.step];
+    }
+
+    info.End();
+}
+
+void Grid::SolvePoissonSOR(Grid &rhs, int stepmax, Info &info)
+{
+    // iteration
+    info.Start();
+
+    double omega = 2.0 / (1 + sin(3.14159265358979 / rhs.nCell)),
+           omegac = 1.0 - omega;
+
+    double error = 1.0;
+    int step = 0;
+    while (step < stepmax)
     {
         info.step++;
         step++;
@@ -744,6 +887,47 @@ void Grid::SolvePoissonSOR(Grid &rhs, double omega, int stepmax, Info &info)
         info.iterErrorN2[info.step] = error;
         // error = info.iterErrorNinf[info.step];
     }
+
+    info.End();
+}
+
+void Grid::SolvePoissonLGSY(Grid &rhs, Info &info)
+{
+    // iteration
+    info.Start();
+
+    // local variables for LGS-Y
+    double *B = new double[nCell - 1], *P = new double[nCell - 1];
+
+    double error = 1.0, errorCrit = info.error;
+    int step = 0;
+    while (step < STEPMAX && error > errorCrit)
+    {
+        info.step++;
+        step++;
+        error = 0.0;
+
+        int indLine, indLeft, indRight;
+        for (int j = 1; j < nCell; j++)
+        {
+            indLine = Index(0, j);
+            indLeft = Index(0, j - 1);
+            indRight = Index(0, j + 1);
+
+            for (int i = 1; i < nCell; i++)
+            {
+                P[i - 1] = 1.0;
+                B[i - 1] = 0.25 * (-rhs.data[indLine + i] + data[indLeft + i] + data[indRight + i]);
+            }
+
+            SolveThomas(nCell - 1, -0.25, P, -0.25, B, &data[indLine + 1], error);
+        }
+        info.iterErrorN2[info.step] = error;
+        // error = info.iterErrorNinf[info.step];
+    }
+
+    delete[] B;
+    delete[] P;
 
     info.End();
 }
@@ -856,6 +1040,130 @@ void Grid::SolvePoissonMGGS(Grid &rhs, int level, int n1, int n2, Info &info)
                 this->operator+=(phiUp[0]);
 
                 SolvePoissonGS(rhs, n2, info);
+
+                // iteration error in fine grid
+                error = info.iterErrorN2[info.step];
+            }
+
+            delete[] phiDown;
+            delete[] phiUp;
+            delete[] res;
+
+            info.End(0);
+        }
+        break;
+        }
+    }
+}
+
+void Grid::SolvePoissonMGSOR(Grid &rhs, int level, int n1, int n2, Info &info)
+{
+    if (nCell % int(pow(2, level - 1)) || level < 2)
+    {
+        cout << "WRONG\n";
+    }
+    else
+    {
+        switch (level)
+        {
+        case 2:
+        {
+            Grid phi_f, phi_c, res_f, res_c;
+            phi_f.Init(nCell);
+            phi_c.Init(nCell / 2);
+            res_f.Init(nCell);
+            res_c.Init(nCell / 2);
+
+            // iteration
+            info.Start(0);
+
+            double error = 1.0, errorCrit = info.error;
+            int step = 0;
+            while (step < STEPMAX && error > errorCrit)
+            {
+                step++;
+                error = 0.0;
+
+                // V-cicle
+                SolvePoissonSOR(rhs, n1, info);
+
+                res_f.InitPoissonRes(*this, rhs);
+                res_c = res_f; // restriction
+
+                phi_c.Flush();
+                phi_c.SolvePoissonSOR(res_c, n1 + n2, info);
+
+                phi_f = phi_c; // interpolation
+                this->operator+=(phi_f);
+                // for (int ind = 0; ind < nSize; ind++)
+                // {
+                //     data[ind] += phi_f.data[ind];
+                // }
+
+                SolvePoissonSOR(rhs, n2, info);
+
+                error = info.iterErrorN2[info.step];
+            }
+
+            info.End(0);
+        }
+        break;
+
+        default:
+        {
+            Grid *phiDown = new Grid[level],
+                 *phiUp = new Grid[level],
+                 *res = new Grid[level];
+
+            for (int l = 0; l < level; l++)
+            {
+                phiDown[l].Init(nCell / pow(2, l));
+                phiUp[l].Init(nCell / pow(2, l));
+                res[l].Init(nCell / pow(2, l));
+            }
+
+            // iteration
+            info.Start(0); // total
+
+            double error = 1.0, errorCrit = info.error;
+            int step = 0;
+
+            while (step < STEPMAX && error > errorCrit)
+            {
+                step++;
+                error = 0.0;
+
+                // V-cycle
+                SolvePoissonSOR(rhs, n1, info);
+
+                res[0].InitPoissonRes(*this, rhs);
+                res[1] = res[0];
+
+                phiDown[1].Flush();
+                phiDown[1].SolvePoissonSOR(res[1], n1, info);
+
+                // down
+                for (int m = 2; m < level; m++)
+                {
+                    res[m - 1].InitPoissonRes(phiDown[m - 1]);
+                    res[m] = res[m - 1]; // restriction
+                    phiDown[m].Flush();
+                    phiDown[m].SolvePoissonSOR(res[m], n1, info);
+                }
+
+                // up
+                for (int m = level - 1; m > 1; m--)
+                {
+                    phiDown[m].SolvePoissonSOR(res[m], n2, info);
+                    phiUp[m - 1] = phiDown[m]; // interpolation
+                    phiDown[m - 1] += phiUp[m - 1];
+                }
+
+                phiDown[1].SolvePoissonSOR(res[1], n2, info);
+                phiUp[0] = phiDown[1];
+                this->operator+=(phiUp[0]);
+
+                SolvePoissonSOR(rhs, n2, info);
 
                 // iteration error in fine grid
                 error = info.iterErrorN2[info.step];

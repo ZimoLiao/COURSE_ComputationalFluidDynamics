@@ -8,8 +8,7 @@ int main()
     info.error = 1e-6;
 
     int level = 4;
-    // TODO: omega的选择！
-    double omega = 2.0 / (1 + sin(3.14159265358979 / (NCELL / pow(2, level - 1))));
+    double omega=1.5; // TODO: omega的选择！
 
     Grid phi(NCELL), rhs, res(NCELL);
 
@@ -54,6 +53,7 @@ int main()
         info.Reset();
 
         phi.SolvePoissonSOR(rhs, omega, info);
+        // phi.SolvePoissonSOR(rhs, info);
         phi.Write("SOR-sol.plt", "phi");
 
         res.InitPoissonRes(phi, rhs);
@@ -61,6 +61,22 @@ int main()
 
         info.Print("SOR");
         info.Write("SOR-info.plt");
+    }
+
+    /* Line G-S method */
+    {
+        phi.Flush();
+        res.Flush();
+        info.Reset();
+
+        phi.SolvePoissonLGSY(rhs, info);
+        phi.Write("LGSY-sol.plt", "phi");
+
+        res.InitPoissonRes(phi, rhs);
+        res.Write("LGSY-res.plt", "phi_res");
+
+        info.Print("LGSY");
+        info.Write("LGSY-info.plt");
     }
 
     /* Multi-grid G-S method */
@@ -86,6 +102,7 @@ int main()
         info.Reset();
 
         phi.SolvePoissonMGSOR(rhs, omega, level, 2, 2, info);
+        // phi.SolvePoissonMGSOR(rhs, level, 2, 2, info);
         phi.Write("MG-SOR-sol.plt", "phi");
 
         res.InitPoissonRes(phi, rhs);
