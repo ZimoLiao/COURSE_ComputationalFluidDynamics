@@ -178,6 +178,9 @@ public:
     void SolvePoissonSOR(Grid &rhs, double omega, Info &info);
     void SolvePoissonSOR(Grid &rhs, double omega, int stepmax, Info &info);
 
+    // Line Gauss-Seidel method (column)
+    void SolvePoissonLGSY(Grid &rhs, Info &info);
+
     // Multi-grid accelerated Gauss–Seidel method
     void SolvePoissonMGJ(Grid &rhs, int level, int n1, int n2, Info &info);
     void SolvePoissonMGGS(Grid &rhs, int level, int n1, int n2, Info &info);
