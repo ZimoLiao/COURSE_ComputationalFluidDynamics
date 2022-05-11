@@ -94,6 +94,16 @@ struct Grid
         this->xmax = xmax;
         dx = (xmax - xmin) / ncell;
 
+        delete[] x;
+        delete[] d;
+        delete[] m;
+        delete[] E;
+        delete[] dPlus;
+        delete[] mPlus;
+        delete[] EPlus;
+        delete[] dMinus;
+        delete[] mMinus;
+        delete[] EMinus;
         x = new double[ncell];
         d = new double[ncell];
         m = new double[ncell];
