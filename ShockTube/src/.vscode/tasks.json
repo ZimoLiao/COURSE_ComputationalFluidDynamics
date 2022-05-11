@@ -18,6 +18,7 @@
                 // "${fileDirname}\\ExactRiemannSolver.cpp",
                 // "${fileDirname}\\FluxVectorSplitting.cpp",
                 // "${fileDirname}\\ExactRiemannSolver.cpp",
+                "${fileDirname}\\Grid.cpp",
                 "${file}",
                 "-o",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe",
