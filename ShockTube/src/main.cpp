@@ -13,7 +13,7 @@ int main()
     for (int i = 0; i < 10000; i++)
     {
         shocktube.FluxEuler_RP(0);
-        shocktube.Advancing(0.0001);
+        shocktube.Advance(0.0001);
     }
     shocktube.WriteAsciiEuler("out.plt");
 }

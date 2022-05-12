@@ -179,7 +179,7 @@ void Grid::WriteAsciiEuler(string fileName)
 
 /* functions */
 // time advancing
-void Grid::Advancing(double tDelta)
+void Grid::Advance(double tDelta)
 {
     double tx = tDelta / xDelta;
 
@@ -280,6 +280,38 @@ void Grid::VariablePlusMinus(int WENO) // v3, v4
 {
     if (WENO)
     {
+        switch (WENO)
+        {
+        case 5: // 5th-order WENO
+        {
+            double *vMean = new double[nCell + 2],
+                   *vPosi = new double[nCell + 2],
+                   *vNega = new double[nCell + 2];
+
+            for (int j = 0; j < 3; j++)
+            {
+                for (int i = 0; i < nCell + 2; i++)
+                {
+                    vMean[i] = v[i][j];
+                }
+                Interpolate_WENO(nCell + 2, vMean, vPosi, vNega, 5);
+
+                for (int i = 0; i < nCell + 2; i++)
+                {
+                    v3[i][j] = vNega[i];
+                    v4[i][j] = vPosi[i];
+                }
+            }
+
+            delete[] vMean;
+            delete[] vPosi;
+            delete[] vNega;
+        }
+        break;
+
+        default:
+            break;
+        }
     }
     else
     {
@@ -291,5 +323,96 @@ void Grid::VariablePlusMinus(int WENO) // v3, v4
                 v4[i][j] = v[i + 1][j];
             }
         }
+    }
+}
+
+/* WENO interpolation */
+void Grid::Interpolate_WENO(int n, double *vMean, double *vPosi, double *vNega, int k)
+{
+    switch (k)
+    {
+    case 1:
+
+        break;
+    case 3:
+
+        break;
+    case 5:
+    {
+        double q[5], alpha[5], beta[5], omega[5], alphaSum;
+
+        for (int i = 2; i < n - 2; i++)
+        {
+            // negative
+            for (int r = 0; r < k; r++)
+            {
+                q[r] = 0.0;
+                for (int j = 0; j < k; j++)
+                {
+                    q[r] += c3rj[r][j] * vMean[i - r + j];
+                }
+            }
+
+            beta[0] = 13. / 12. * pow(vMean[i] - 2. * vMean[i + 1] + vMean[i + 2], 2) + 0.25 * pow(3. * vMean[i] - 4. * vMean[i + 1] + vMean[i + 2], 2);
+            beta[1] = 13. / 12. * pow(vMean[i - 1] - 2. * vMean[i] + vMean[i + 1], 2) + 0.25 * pow(vMean[i - 1] - vMean[i + 1], 2);
+            beta[2] = 13. / 12. * pow(vMean[i - 2] - 2. * vMean[i - 1] + vMean[i], 2) + 0.25 * pow(vMean[i - 2] - 4. * vMean[i - 1] + 3. * vMean[i], 2);
+
+            alphaSum = 0.0;
+            for (int r = 0; r < k; r++)
+            {
+                alpha[r] = d3[r] / pow(1e-6 + beta[r], 2);
+                alphaSum += alpha[r];
+            }
+
+            vNega[i] = 0.0;
+            for (int r = 0; r < k; r++)
+            {
+                omega[r] = alpha[r] / alphaSum;
+                vNega[i] += omega[r] * q[r];
+            }
+
+            // positive
+            // TODO: 如果数组支持负指标更方便得多
+            q[0] = 0.0;
+            for (int j = 0; j < k; j++)
+            {
+                q[0] += c3rj[k - 1][k - 1 - j] * vMean[i + j];
+            }
+            for (int r = 1; r < k; r++)
+            {
+                q[r] = 0.0;
+                for (int j = 0; j < k; j++)
+                {
+                    q[r] += c3rj[r - 1][j] * vMean[i - r + j];
+                }
+            }
+
+            alphaSum = 0.0;
+            for (int r = 0; r < k; r++)
+            {
+                alpha[r] = d3[k - 1 - r] / pow(1e-6 + beta[r], 2);
+                alphaSum += alpha[r];
+            }
+
+            vPosi[i - 1] = 0.0;
+            for (int r = 0; r < k; r++)
+            {
+                omega[r] = alpha[r] / alphaSum;
+                vPosi[i - 1] += omega[r] * q[r];
+            }
+        }
+
+        // TODO: 偷懒  其实应该降阶WENO
+        vNega[0] = vMean[0];
+        vNega[1] = vMean[1];
+        vNega[n - 2] = vMean[n - 2];
+        vPosi[0] = vMean[1];
+        vPosi[n - 3] = vMean[n - 2];
+        vPosi[n - 2] = vMean[n - 1];
+    }
+    break;
+    case 7:
+
+        break;
     }
 }
