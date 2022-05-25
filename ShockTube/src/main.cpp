@@ -4,7 +4,7 @@ int main()
 {
     Grid shocktube;
 
-    shocktube.InitGrid(400, 3, -2.0, 2.0);
+    shocktube.InitGrid(100, 3, -2.0, 2.0);
 
     double vL[3] = {1.0, 0.0, 2.5},
            vR[3] = {0.125, 0.0, 0.25};
