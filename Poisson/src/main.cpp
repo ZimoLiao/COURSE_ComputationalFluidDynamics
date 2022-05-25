@@ -8,7 +8,8 @@ int main()
     info.error = 1e-6;
 
     int level = 4;
-    double omega=1.5; // TODO: omega的选择！
+    double omega = 1.5; // TODO: omega的选择！
+    // omega = 2 / (1 + sin(3.1415926535897932 / NCELL));
 
     Grid phi(NCELL), rhs, res(NCELL);
 

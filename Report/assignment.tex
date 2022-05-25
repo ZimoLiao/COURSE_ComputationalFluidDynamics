@@ -1,0 +1,330 @@
+\documentclass[11pt]{article}
+\usepackage{xeCJK}
+\usepackage{geometry}
+\usepackage{bm}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{subfigure}
+\usepackage{datetime}
+\usepackage{fontspec}
+\usepackage{fancyhdr}
+\usepackage{indentfirst}
+\usepackage{titlesec}
+\usepackage[round]{natbib}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{enumitem}
+
+% global style
+\geometry{b5paper,left=0.6in,right=0.6in,top=1in,bottom=0.8in}
+\linespread{1.3}
+\setlength{\parindent}{2em}
+
+\renewcommand{\today}{\small \number\year 年 \number\month 月 \number\day 日}
+\renewcommand{\abstractname}{\normalsize 摘\ \ 要}
+\renewcommand{\contentsname}{目录}
+\renewcommand{\refname}{参考文献}
+\renewcommand{\sectionmark}[1]{\markright{第\,\thesection\,章\, #1}}
+
+% title style
+\titleformat*{\section}{\Large\bfseries}
+\titleformat*{\subsection}{\large\bfseries}
+\titleformat*{\subsubsection}{\normalsize\bfseries}
+
+% font style
+\setCJKmainfont{SimSun}[BoldFont=SimHei, ItalicFont=KaiTi]
+\setmainfont{Times New Roman}[BoldFont=Arial]
+
+% page style
+\fancypagestyle{assignment}{
+    \fancyhf{}
+    \fancyfoot[C]{\thepage}
+    \fancyhead[L]{\small 廖紫默 (SA21005043)}
+    \fancyhead[C]{\small \textbf{计算流体力学}}
+    \fancyhead[R]{\small 2022年春}
+    \renewcommand{\headrulewidth}{0.4pt}
+    \renewcommand{\footrulewidth}{0.4pt}
+}
+\pagestyle{assignment}
+
+% ref style (in chinese)
+\def\equationautorefname{式}%
+\def\footnoteautorefname{脚注}%
+\def\itemautorefname{项}%
+\def\figureautorefname{图}%
+\def\figurename{图}
+\def\tableautorefname{表}%
+\def\tablename{表}
+\def\partautorefname{篇}%
+\def\appendixautorefname{附录}%
+\def\chapterautorefname{章}%
+\def\sectionautorefname{节}%
+\def\subsectionautorefname{小节}%
+\def\subsubsectionautorefname{subsubsection}%
+\def\paragraphautorefname{段落}%
+\def\subparagraphautorefname{子段落}%
+\def\FancyVerbLineautorefname{行}%
+\def\theoremautorefname{定理}%
+
+% header
+\title{\LARGE\textbf{计算流体力学 大作业报告}}
+\author{\normalsize 廖紫默 (SA21005043)\\
+\small 近代力学系，中国科学技术大学\\
+\small \href{mailto:zimoliao@mail.ustc.edu.cn}{zimoliao@mail.ustc.edu.cn}}
+\date{\today}
+
+\begin{document}
+
+% titlepage
+\maketitle
+\thispagestyle{assignment}
+\pagenumbering{roman}
+% \begin{abstract}
+%     gp
+% \end{abstract}
+
+\tableofcontents
+% titlepage end
+
+% part 2
+\newpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\section{Poisson equation}
+求解Poisson方程并绘制等值线$\phi=\left(0.05,\ 0.2,\ 0.5,\ 0.75,\ 1\right)$：
+\begin{align}
+	 & \frac{\partial^2\phi}{\partial x^2}+\frac{\partial^2\phi}{\partial y^2}=\sin{x}\cos{y},\quad 0\leq x\leq 1,\ 0\leq y\leq 1, \label{eqn:poisson} \\
+	 & \text{BCs: }\left\{\begin{array}{ll}
+		\phi(0,y)=0,                  & \phi(1,y)=y-\dfrac{\sin{1}\cos{y}}{2}, \\[8pt]
+		\phi(x,0)=-\dfrac{\sin x}{2}, & \phi(1,y)=x-\dfrac{\sin{x}\cos{1}}{2}
+	\end{array}\right.
+\end{align}
+
+要求采用方法：
+\begin{enumerate}[label=(\arabic*)]
+	\item Jacobi、G-S选一；SOR、线SOR、块SOR选一。迭代法要求误差$10^{-6}$。
+	\item CG方法、MG方法选一。
+\end{enumerate}
+
+\subsection{Discretization}
+采用二阶精度的中心差分格式近似二阶导数项：
+\begin{equation}
+	\left(\frac{\partial^2\phi}{\partial x^2}\right)_i\simeq\frac{\phi_{i+1}+\phi_{i-1}-2\phi_i}{(\Delta x)^2}
+\end{equation}
+Poisson方程转化为五点离散的代数方程组：
+\begin{equation}
+	A_P\phi_P+A_W\phi_W+A_E\phi_E+A_S\phi_S+A_N\phi_N=Q_P
+\end{equation}
+其中$A_{K},\ K=(P,W,E,S,N)$为插值系数，$Q_P$为右端项。
+
+\subsection{Explicit methods}
+对于一般的线性代数方程组：
+\begin{equation}
+	A\bm{\phi}=\bm{Q} \label{eqn:algebra}
+\end{equation}
+其数值解法通常分为直接方法和迭代方法两大类。虽然前者（Gauss消去、LU分解）可以直接得到精确解（计算机精度下），但在一般的PDE问题中，离散误差远大于计算精度\citep{ferziger_computational_2020}，采用低效的直接解法是不明智的选择。由此，代数方程组（特别是大型稀疏系统）的迭代求解方法在CFD中取得了广泛应用\citep{saad_iterative_2003}。
+
+迭代方法的基本思想在于将\autoref{eqn:algebra}转化为下述迭代方程：
+\begin{equation}
+	M\bm{\phi}^{n+1}=N\bm{\phi}^n+\bm{B}
+\end{equation}
+令$A=M-N,\ \bm{B}=\bm{Q}$，那么当迭代收敛时，$\bm{\phi}^{n+1}=\bm{\phi}^n=\bm{\phi}$，上式等价于原始方程组。后续介绍的几类迭代方法，其本质区别就在于$M$、$N$采用不同的构造形式。
+
+\subsubsection{Jacobi method}
+Jacobi方法将$M$选为系数矩阵$A$的对角部分，$N$为非对角部分，迭代式中$M$的逆可以由对角元素分之一直接得到，非常容易构造与求解。离散形式的迭代方程为：
+\begin{equation}
+	\phi_P^{n+1}=\frac{Q_P-A_S\phi_S^n-A_W\phi_W^n-A_N\phi_N^n-A_E\phi_E^n}{A_P}
+\end{equation}
+若记$A=L+D+U$，分别表示其下三角、对角、上三角部分，那么Jacobi方法可以写为矩阵形式\citep{sauer_numerical_2018}：
+\begin{equation}
+	\bm{\phi}^{n+1}=D^{-1}\left[\bm{B}-(L+U)\bm{\phi}^n\right]
+\end{equation}
+
+\subsubsection{Gauss-Seidel (GS) method}
+Gauss-Seidel方法在Jacobi方法的基础上做了细微的优化，即将每个网格点上迭代更新的值立即用于下一点的迭代。
+\begin{equation}
+	\phi_P^{n+1}=\frac{Q_P-A_S\phi_S^{n+1}-A_W\phi_W^{n+1}-A_N\phi_N^n-A_E\phi_E^n}{A_P}
+\end{equation}
+矩阵形式写为（从左下，即西南角开始迭代）：
+\begin{equation}
+	\bm{\phi}^{n+1}=D^{-1}\left(\bm{B}-U\bm{\phi}^n-L\bm{\phi}^{n+1}\right)
+\end{equation}
+
+\subsubsection{Successive over-relaxation (SOR) method}
+SOR的思路是在GS方法基础上引入超松弛因子$2>\omega>1$来加速迭代，实现快速收敛。
+\begin{equation}
+	\phi_P^{n+1}=\omega\frac{Q_P-A_S\phi_S^{n+1}-A_W\phi_W^{n+1}-A_N\phi_N^n-A_E\phi_E^n}{A_P}+(1-\omega)\phi_P^n
+\end{equation}
+对于椭圆型PDE，矩形几何，Dirichlet边界条件的情况，可选取$\omega=2/[1+\sin{(\pi/N)}]$，$N$为网格数\citep{ferziger_computational_2020,brazier_optimum_1974}。
+
+\subsection{Semi-implicit methods}
+
+\subsubsection{TDMA}
+虽然Gauss消去与LU分解两种直接解法时间复杂度很高，前者为$\mathcal{O}(N^3)$。但在系数矩阵为三对角矩阵这一特殊情况下，追赶法，也称Thomas算法、Tridiagonal Matrix Algorithm (TDMA)，可以实现其高效精确求解。考虑如下方程组：
+\begin{equation}
+	A_W^i\phi_{i-1}+A_P^i\phi_i+A_E^i\phi_{i+1}=Q_i
+\end{equation}
+
+首先从上到下消去对角元左侧一列元素：
+\begin{equation}
+	A_P^i=A_P^i-\frac{A_W^iA_E^{i-1}}{A_P^{i-1}},\quad Q_i^*=Q_i-\frac{A_W^iQ_{i-1}^*}{A_P^{i-1}}
+\end{equation}
+随后自下而上回代即可得到精确解：
+\begin{equation}
+	\phi_i=\frac{Q_i^*-A_E^i\phi_{i+1}}{A_P^i}
+\end{equation}
+该方法的时间复杂度仅为$\mathcal{O}(N)$。
+
+\subsubsection{Line successive over-relaxation (LSOR)}
+LSOR方法（包括LGS）属于splitting方法（或称approximate factorization (AF)，近似因子法）的一种。该类方法的思想在于引入高阶导项，在不影响离散格式阶数的条件下，把原始多维问题（差分算子）拆分为多个一维问题，进而可以在单一维度上采用优化的隐式方法直接求解（如前文所述的TDMA）。
+
+LSOR方法在迭代过程中，逐列（行）构造三对角矩阵隐式求解，进而实现加速。以逐列隐式为例（记为LSOR-Y），在原SOR迭代方程中用$\phi_N^{n+1}$替代$\phi_N^n$，得到：
+\begin{equation}
+	\phi_P^{n+1}=\omega\frac{Q_P-A_S\phi_S^{n+1}-A_W\phi_W^{n+1}-A_N\phi_N^{n+1}-A_E\phi_E^n}{A_P}+(1-\omega)\phi_P^n
+\end{equation}
+继而转化为三对角矩阵问题：
+\begin{equation}
+	\frac{\omega A_S}{A_P}\phi_S^{n+1}+\phi_P^{n+1}+\frac{\omega A_N}{A_P}\phi_N^{n+1}=\omega\frac{Q_P-A_W\phi_W^{n+1}-A_E\phi_E^n}{A_P}+(1-\omega)\phi_P^n
+\end{equation}
+其中$\phi_W^{n+1}$为前一列已经计算得到的值，所以右端项均为已知量，该方程采用TDMA求解即可。
+
+\subsection{Acceleration techniques}
+\subsubsection{Multi-grid method}
+采用Fourier级数对均匀网格上误差方程进行分析，可以发现（相对网格尺寸）：误差的短波分量收敛快、长波分量收敛较慢。一般的迭代方法初始收敛快，对应误差的短波分量快速衰减，而后收敛显著减缓，对应长波分量的缓慢衰减。
+
+基于这一认识，Multi-grid采用了分而治之的思想，构造多套逐步粗化的网格，在每套网格上利用初始迭代步迅速衰减掉当前网格对应的短波分量，将误差长波分量的部分交给更粗一级的网格迭代，如此递归下去。实际求解时，由于误差在粗、细网格间传递（restriction、interpolation）时也会引入额外的误差，所以需要重复前述递归过程，直至原始网格上解的精度达到收敛准则。
+
+% TODO: 流程图 tikz
+
+\subsection{Results and discussion}
+采用前述各类方法编写C++代码求解Poisson方程，网格尺寸选取为$128\times128$。其中SOR与MG-SOR方法中$\omega$选取为1.5，MG方法采用4层网格V循环，单次V循环中每层在向下、向上路径上各迭代2次。
+
+\autoref{fig:poisson1}与\autoref{fig:poisson2}分别展示了Jacobi、GS、LGS-Y、SOR、MG-GS、MG-SOR等方法求解前述五点离散Poisson方程边值问题的结果与残差分布。\autoref{fig:poisson_error}绘制了收敛曲线，其中Jacobi、GS、LGS-Y、SOR方法达到$10^{-6}$误差所需步数及计算耗时见\autoref{tab:poisson}。\footnote{为确保计算时间直接反应不同算法本身的效率（而非计算机底层逻辑优化的结果），编译时未开启自动优化-Ox选项。事实上，若开启编译优化指令，那么Jacobi方法将会显著快于GS、LGS-Y等方法，个人认为这是算法本身的可并行性导致的，编译器优化对于Jacobi算法会自动开启底层向量化运算，而GS、SOR、LGS-Y等方法中每步计算是具有依赖关系的，无法并行。特别的，开启优化后，MG加速方法仍然有效。}
+
+\begin{table}[htbp]
+	\centering
+	\caption{\label{tab:poisson}各方法求解Poisson方程迭代步数与时间。方括号中给出超松弛因子$\omega$取\citet{brazier_optimum_1974}的推荐值时SOR方法的结果；圆括号中给出了MG方法的等价迭代步数}\vspace{1ex} % TODO: 检查等效步数
+	\begin{tabular}{lcccccc}
+		\toprule
+		        & Jacobi & GS    & LGS-Y & SOR           & MG-GS      & MG-SOR     \\
+		\midrule
+		step    & 3555   & 2427  & 1658  & 1148 [258]    & 2656 (876) & 1440 (475) \\
+		time(s) & 1.856  & 1.167 & 0.807 & 0.622 [0.144] & 0.541      & 0.308      \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+对比各方法的测试结果，上表各方法从左至右效率逐渐提高，即达到收敛所需的迭代步数减小、计算时间减小。MG-SOR方法可以实现6倍于Jacobi方法的提速。
+
+% TODO: 比较精确解结果
+
+
+\begin{figure}[htbp] % TODO: 如果只考虑MG外层迭代步是否更直观
+	\centering
+	\subfigure[常规迭代方法]{\includegraphics[width=.8\linewidth]{figure/poisson/error.png}}
+	\subfigure[多重网格加速方法（含粗网格迭代）]{\includegraphics[width=.8\linewidth]{figure/poisson/error-MG.png}}
+	\caption{\label{fig:poisson_error}误差随迭代步的收敛曲线}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\subfigure[Jacobi 解分布]{\includegraphics[width=.45\linewidth]{figure/poisson/Jacobi-sol.png}}
+	\subfigure[Jacobi 残差分布]{\includegraphics[width=.45\linewidth]{figure/poisson/Jacobi-res.png}}
+
+	\subfigure[GS 解分布]{\includegraphics[width=.45\linewidth]{figure/poisson/GS-sol.png}}
+	\subfigure[GS 残差分布]{\includegraphics[width=.45\linewidth]{figure/poisson/GS-res.png}}
+
+	\subfigure[LGS-Y 解分布]{\includegraphics[width=.45\linewidth]{figure/poisson/LGSY-sol.png}}
+	\subfigure[LGS-Y 残差分布]{\includegraphics[width=.45\linewidth]{figure/poisson/LGSY-res.png}}
+
+	\caption{\label{fig:poisson1}各种迭代法求解Poisson方程的结果与残差}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+
+	\subfigure[SOR 解分布]{\includegraphics[width=.45\linewidth]{figure/poisson/SOR-sol.png}}
+	\subfigure[SOR 残差分布]{\includegraphics[width=.45\linewidth]{figure/poisson/SOR-res.png}}
+
+	\subfigure[MG-GS 解分布]{\includegraphics[width=.45\linewidth]{figure/poisson/MG-GS-sol.png}}
+	\subfigure[MG-GS 残差分布]{\includegraphics[width=.45\linewidth]{figure/poisson/MG-GS-res.png}}
+
+	\subfigure[MG-SOR 解分布]{\includegraphics[width=.45\linewidth]{figure/poisson/MG-SOR-sol.png}}
+	\subfigure[MG-SOR 残差分布]{\includegraphics[width=.45\linewidth]{figure/poisson/MG-SOR-res.png}}
+
+	\caption{\label{fig:poisson2}各种迭代法求解Poisson方程的结果与残差}
+\end{figure}
+
+
+\newpage
+\section{Sod shock tube problem}
+针对如下Sod激波管问题：
+\begin{align}
+	 & \left\{\begin{array}{l}
+		\dfrac{\partial\rho}{\partial t}+\dfrac{\partial(\rho u)}{\partial x}=0         \\[8pt]
+		\dfrac{\partial(\rho u)}{\partial t}+\dfrac{\partial(\rho u^2+p)}{\partial x}=0 \\[8pt]
+		\dfrac{\partial(\rho E)}{\partial t}+\dfrac{\partial(\rho Eu+pu)}{\partial x}=0
+	\end{array}\right.,\quad x\in[0,1] \label{eqn:euler}           \\
+	 & \text{IC: }\left(\rho,\ u,\ p\right)|_{t=0}=\left\{\begin{array}{ll}
+		(1,\ 0,\ 1)       & x<0.5    \\
+		(0.125,\ 0,\ 0.1) & x\geq0.5
+	\end{array}\right.
+\end{align}
+分别采用Lax–Wendroff格式、van Leer格式、Roe格式、5阶WENO格式计算其数值解。
+
+\subsection{The Riemann problem of Euler equations}
+
+\subsection{Lax-Wendroff scheme}
+
+\subsection{Flux vector splitting methods}
+\subsubsection{Steger-Warming splitting}
+
+\subsubsection{van Leer splitting}
+
+\subsection{Flux difference splitting methods}
+\subsubsection{Roe-Pike method}
+
+\subsection{High order methods}
+\subsubsection{WENO reconstruction}
+
+\subsubsection{Finite volume WENO}
+
+\subsubsection{Finite difference WENO}
+
+\subsection{Results and discussion}
+
+\newpage
+\section{2D compression ramp}
+针对如下二维超声速来流入射压缩拐角问题，选用合适的离散格式计算其数值解。
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=.5\linewidth]{figure/sketch/ramp.pdf}
+	\caption{\label{fig:ramp}压缩拐角}
+\end{figure}
+
+控制方程（二维Euler方程）如下：
+\begin{align}
+	 & \left\{\begin{array}{l}
+		\dfrac{\partial\rho}{\partial t}+\dfrac{\partial(\rho u)}{\partial x}+\dfrac{\partial(\rho v)}{\partial y}=0           \\[8pt]
+		\dfrac{\partial(\rho u)}{\partial t}+\dfrac{\partial(\rho u^2+p)}{\partial x}+\dfrac{\partial(\rho u v)}{\partial y}=0 \\[8pt]
+		\dfrac{\partial(\rho v)}{\partial t}+\dfrac{\partial(\rho uv)}{\partial x}+\dfrac{\partial(\rho v^2+p)}{\partial y}=0  \\[8pt]
+		\dfrac{\partial(\rho E)}{\partial t}+\dfrac{\partial(\rho Eu+pu)}{\partial x}+\dfrac{\partial(\rho Ev+pv)}{\partial y}=0
+	\end{array}\right., \label{eqn:euler2}              \\
+	 & \quad \rho E=\frac{p}{\gamma-1}+\frac{1}{2}\rho(u^2+v^2),\quad p=\rho R T
+\end{align}
+来流条件为：$Ma_\infty=3,\ T_\infty=288.16\ \mathrm{K},\ p=101.325\ \mathrm{kPa}$。此外，$H=10\ \mathrm{m}$，气体参数$R=287\ \mathrm{J/(kg\cdot K)},\ \gamma=1.4$。
+
+\subsection{Coordinate transformation}
+
+\subsection{Dimensional splitting}
+
+\subsection{Numerical methods}
+
+\subsection{Results and discussion}
+
+\newpage
+\bibliographystyle{unsrtnat}
+\bibliography{ref}
+
+\end{document}
