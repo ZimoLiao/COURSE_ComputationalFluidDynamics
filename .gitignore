@@ -54,6 +54,8 @@ misc/*
 *.toc
 *.png
 *.jpg
+*.docx
+*.doc
 
 # Output
 *.plt
