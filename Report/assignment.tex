@@ -463,10 +463,29 @@ Van Leer在构造通量分裂时额外增加了两项条件：
 \subsubsection{WENO reconstruction}
 加权本质无振荡（weighted essentially non-oscillatory, WENO）格式\citep{liu_weighted_1994}是在本质无振荡（ENO）格式思想上的进一步拓展，根据子模版上的光滑程度对插值结果加权，而非ENO方法中仅保留最光滑的模板。\citet{jiang_efficient_1996}一文在最初版本WENO的基础上提出了一种新的光滑因子计算方法，这一形式的WENO格式也称WENO-JS，在流体力学等领域取得了极为广泛的应用。
 
-ENO、WENO格式的基本思想包含下列几点：
-\begin{enumerate}[label=(\arabic*)]
-	\item 
-\end{enumerate}
+接下来我们对ENO/WENO方法中最基本的思想和操作步骤简单做一个简单的介绍：
+\paragraph{重构} 对于双曲守恒律，将离散节点上的值看作单个网格内的平均值（即有限体积思想）
+\begin{equation}
+	\bar{v}_i\equiv\frac{1}{\Delta x_i}\int_{x_{i-\frac{1}{2}}}^{x_{i+\frac{1}{2}}}v(\xi)\mathrm{d}\xi
+\end{equation}
+我们通过选取模板（stencil）$S(i)\equiv\{I_{i-r,\cdots,I_{i+s}}\},\ I_i\equiv\left[x_{i-\frac{1}{2}},x_{i+\frac{1}{2}}\right]$，其中$r$表示模板相对$i$节点向左的偏移量。根据模板点上已知的平均值$\bar{v}_{i-r+j},\ j=0,\cdots k-1$做插值，近似$v(x)$的原函数（primitive function）而非其本身：
+\begin{equation}
+	V(x)\equiv\int_{-\infty}^x v(\xi)\mathrm{d}\xi
+\end{equation}
+进而间接得到$v$在界面（cell boundary）处的重构值：
+\begin{equation}
+	v_{i+\frac{1}{2}}=\sum_{j=0}^{k-1}c_{rj}\bar{v}_{i-r+j}
+\end{equation}
+
+对于均匀网格$\Delta x_i=\Delta x$，插值系数可由下式求得：
+\begin{equation}
+	c_{rj}=\sum_{m=j+1}^k\dfrac{\sum_{l=0;\ l\neq m}^k\prod_{q=0;\ q\neq m,l}^k\left(r-q+1\right)}{\prod_{l=0;\ l\neq m}^k\left(m-l\right)}
+\end{equation}
+下文所述的ENO、WENO重构都是基于这一插值重构过程，主要区别在于模板的选取方法不同。
+\paragraph{ENO重构} 我们知道在牛顿插值中，利用差商（Divided differences）的性质，每增加一个模板点，仅需在原有多项式基础上增添一项，便可得到更高一阶的插值多项式\citep{sauer_numerical_2018}。另一个关键要素在于，差商的大小本身可以表征该模板上值的光滑程度\citep{cockburn_advanced_1998}。
+
+ENO重构的核心思路就是，利用牛顿差商的性质，我们可以从单点模板开始，逐步从左或右扩展模板，每次对比左右扩展模板的光滑程度，选取较光滑的一侧作为高一阶的模板。重复这一模板选取过程，直至达到我们给定的阶数，即可获得当前阶数下光滑程度最好的模板（避开强间断），用于前述重构过程。
+
 
 \subsubsection{Finite volume WENO}
 
