@@ -458,7 +458,15 @@ Van Leer在构造通量分裂时额外增加了两项条件：
 原始Roe方法需要构造平均Jacobian矩阵，事实上该构造过程是没有必要的，Roe，Pike提出了另一种实现方法，避免了矩阵运算。
 
 \subsection{High order methods}
+
+
 \subsubsection{WENO reconstruction}
+加权本质无振荡（weighted essentially non-oscillatory, WENO）格式\citep{liu_weighted_1994}是在本质无振荡（ENO）格式思想上的进一步拓展，根据子模版上的光滑程度对插值结果加权，而非ENO方法中仅保留最光滑的模板。\citet{jiang_efficient_1996}一文在最初版本WENO的基础上提出了一种新的光滑因子计算方法，这一形式的WENO格式也称WENO-JS，在流体力学等领域取得了极为广泛的应用。
+
+ENO、WENO格式的基本思想有：
+\begin{enumerate}[label=(\arabic*)]
+	\item 
+\end{enumerate}
 
 \subsubsection{Finite volume WENO}
 
