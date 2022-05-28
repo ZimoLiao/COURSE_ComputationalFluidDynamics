@@ -482,14 +482,104 @@ Van Leer在构造通量分裂时额外增加了两项条件：
 	c_{rj}=\sum_{m=j+1}^k\dfrac{\sum_{l=0;\ l\neq m}^k\prod_{q=0;\ q\neq m,l}^k\left(r-q+1\right)}{\prod_{l=0;\ l\neq m}^k\left(m-l\right)}
 \end{equation}
 下文所述的ENO、WENO重构都是基于这一插值重构过程，主要区别在于模板的选取方法不同。
+
 \paragraph{ENO重构} 我们知道在牛顿插值中，利用差商（Divided differences）的性质，每增加一个模板点，仅需在原有多项式基础上增添一项，便可得到更高一阶的插值多项式\citep{sauer_numerical_2018}。另一个关键要素在于，差商的大小本身可以表征该模板上值的光滑程度\citep{cockburn_advanced_1998}。
 
 ENO重构的核心思路就是，利用牛顿差商的性质，我们可以从单点模板开始，逐步从左或右扩展模板，每次对比左右扩展模板的光滑程度，选取较光滑的一侧作为高一阶的模板。重复这一模板选取过程，直至达到我们给定的阶数，即可获得当前阶数下光滑程度最好的模板（避开强间断），用于前述重构过程。
 
+\paragraph{WENO重构} 虽然ENO针对双曲守恒律提出了根据光滑程度选取模板的思想，但容易发现上述实现存在许多缺陷：
+\begin{enumerate}
+	\item 在光滑区间，ENO非必要地舍弃了相对“非光滑”的模板，造成了精度损失；
+	\item 数值通量非光滑，即相邻两点间的模板选取可能有明显区别；
+	\item 模板选取过程中总共需要考虑$k$个候选模板，覆盖了$2k-1$个网格点，但仅有一个模板被用于最后的重构$k$阶精度；
+	\item 模板选取过程中存在大量逻辑运算（if语句），对于早期计算机来说比较耗时。
+\end{enumerate}
+由此，WENO方法即在ENO思想的基础上提出了按模板光滑程度加权的操作，直接考虑$k$个子模版（无需像ENO一样逐步比较扩展）：
+\begin{equation}
+	S_r(i)=\left\{x_{i-r},\cdots,x_{i-r+k-1}\right\},\quad r=0,\cdots,k-1
+\end{equation}
+在每个候选模板上，都可以得到$v_{i+\frac{1}{2}}$的重构值：
+\begin{equation}
+	v_{i+\frac{1}{2}}^{(r)}=\sum_{j=0}^{k-1}c_{rj}\bar{v}_{i-r+j},\quad r=0,\cdots,k-1
+\end{equation}
+WENO采用了上述子模版重构值的凸组合（convex combination）作为$v(x_{i+\frac{1}{2}})$的近似：
+\begin{equation}
+	v_{i+\frac{1}{2}}=\sum_{r=0}^{k-1}\omega_rv_{i+\frac{1}{2}}^{(r)}
+\end{equation}
+其中权重满足$\omega_r\geq0,\ \sum_{r=0}^{k-1}\omega_r=1$。
 
-\subsubsection{Finite volume WENO}
+注意到当所有子模版上函数$v(x)$都光滑的情况下，存在理想权重$d_r$使得上述重构具有$2k-1$阶精度：
+\begin{equation}
+	v_{i+\frac{1}{2}}=\sum_{r=0}^{k-1}d_r v_{i+\frac{1}{2}}^{(r)}=v(x_{i+\frac{1}{2}})+\mathcal{O}(\Delta x^{2k-1})
+\end{equation}
+其中$d_r$可以通过对比子模版和全模板（即$2k-1$点构成的整个模板）上多项式重构的系数，求解代数方程组得到。显然，权函数$\omega_r$的设计需要满足在光滑条件下退化为理想权重$d_r$，即$\omega_r=d_r+\mathcal{O}(\Delta x^{2k-1})$。
 
-\subsubsection{Finite difference WENO}
+通过对误差量级的分析以及权函数需满足的稳定性、一致性条件，可以得到下述表达式：
+\begin{equation}
+	\omega_r=\frac{\alpha_r}{\sum_{s=0}^{k-1}\alpha_s},\quad r=0,\cdots,k-1
+\end{equation}
+其中：
+\begin{equation}
+	\alpha_r=\frac{d_r}{(\epsilon+\beta_r)^2}
+\end{equation}
+\citet{jiang_efficient_1996}提出了光滑因子（smooth indicators）$\beta_r$的一种形式（与基于$L^1$模的总变差定义相近，但这里是基于$L^2$模）：
+\begin{equation}
+	\beta_r=\sum_{l=1}^{k-1}\int_{x_{i-\frac{1}{2}}}^{x^{i+\frac{1}{2}}}\Delta x^{2l-1}\left(\frac{\partial^l p_r(x)}{\partial^l x}\right)^2\ \mathrm{d}x
+\end{equation}
+
+\paragraph{一维WENO重构过程} 给定函数$v(x)$在cell（$I_i$）内的平均值$\{\bar{v}_i\}$。通过下述过程得到cell boundary上迎风偏置的$2k-1$阶近似，记$v_{i-\frac{1}{2}}^+$和$v_{i+\frac{1}{2}}^-$。
+\begin{enumerate}
+	\item 得到具有$k$阶精度的$k$个重构值$v_{i+\frac{1}{2}}^{(r)}$与$v_{i-\frac{1}{2}}^{(r)}$；
+	\item 确定理想权重值$d_r$与$\tilde{d}_r$，由对称性可知$\tilde{d}_r=d_{k-1-r}$；
+	\item 计算光滑因子$\beta_r,\ r=0,\cdots,k-1$；
+	\item 计算权重$\omega_r$与$\tilde{\omega}_r$；
+	\item 得到$2k-1$阶重构：
+	      $$
+		      v_{i+\frac{1}{2}}^-=\sum_{r=0}^{k-1}\omega_rv_{i+\frac{1}{2}}^{(r)},\quad v_{i-\frac{1}{2}}^+=\sum_{r=0}^{k-1}\omega_rv_{i-\frac{1}{2}}^{(r)}
+	      $$
+\end{enumerate}
+
+对于5阶WENO（即$k=3$），各常系数与权函数如下：
+\begin{equation}
+	d_0=\frac{3}{10},\quad d_1=\frac{3}{5},\quad d_2=\frac{1}{10}
+\end{equation}
+\begin{equation}
+	\left\{\begin{array}{l}
+		\beta_0 =\dfrac{13}{12}\left(\bar{v}_{i}-2\bar{v}_{i+1}+\bar{v}_{i+2}\right)^2+\dfrac{1}{4}\left(3\bar{v}_{i}-4\bar{v}_{i+1}+\bar{v}_{i+2}\right)^2 \\[8pt]
+		\beta_1 =\dfrac{13}{12}\left(\bar{v}_{i-1}-2\bar{v}_{i}+\bar{v}_{i+1}\right)^2+\dfrac{1}{4}\left(\bar{v}_{i-1}-\bar{v}_{i+1}\right)^2               \\[8pt]
+		\beta_2 =\dfrac{13}{12}\left(\bar{v}_{i-2}-2\bar{v}_{i-1}+\bar{v}_{i}\right)^2+\dfrac{1}{4}\left(\bar{v}_{i-2}-4\bar{v}_{i-1}+3\bar{v}_{i}\right)^2
+	\end{array}\right.
+\end{equation}
+\begin{table*}[htbp]
+	\centering
+	\caption{\label{tab:crj}$k=3$时重构系数$c_{rj}$}\vspace{1ex}
+	\begin{tabular}{cccc}
+		\toprule
+		$r$  & $j=0$  & $j=1$  & $j=2$  \\
+		\midrule
+		$-1$ & $11/6$ & $-7/6$ & $1/3$  \\
+		$0$  & $1/3$  & $5/6$  & $-1/6$ \\
+		$1$  & $-1/6$ & $5/6$  & $1/3$  \\
+		$2$  & $1/3$  & $-7/6$ & $11/6$ \\
+		\bottomrule
+	\end{tabular}
+\end{table*}
+
+\subsubsection{Finite volume 1D WENO}
+有限体积方法下，结合Godunov类方法（FDS），双曲守恒律的高阶WENO实现过程如下：
+\begin{enumerate}
+	\item 对所有$i$，使用WENO得到cell boundary上的重构值$u_{i+\frac{1}{2}}^-$与$u_{i-\frac{1}{2}}^+$；
+	\item 根据重构得到的cell boundary上的左右值$u_{i+\frac{1}{2}}^\pm$，选取任一方法计算数值通量（Godunov、HLL/HLLC）。
+\end{enumerate}
+
+\subsubsection{Finite difference 1D WENO}
+有限差分方法（结合FVS）与上述思路不同，我们并非对变量重构得到cell boundary上的左右值继而计算数值通量，而是先在各离散点上计算分裂通量，随后重构cell boundary上的分裂通量值。
+\begin{enumerate}
+	\item 选择任一通量分裂方法（Lax-Friedrichs、Steger-Warming、van Leer、AUSM），计算离散网格点上的分裂通量$f^\pm(u_i)$；
+	\item 使用$\bar{v}_i=f^+(u_i)$做WENO重构，得到正通量$\hat{f}^+_{i+\frac{1}{2}}=v^-_{i+\frac{1}{2}}$；
+	\item 使用$\bar{v}_i=f^-(u_i)$做WENO重构，得到负通量$\hat{f}^-_{i+\frac{1}{2}}=v^+_{i+\frac{1}{2}}$；
+	\item 得到数值通量$\hat{f}_{i+\frac{1}{2}}=\hat{f}^+_{i+\frac{1}{2}}+\hat{f}^-_{i+\frac{1}{2}}$。
+\end{enumerate}
 
 \subsection{Results and discussion}
 
