@@ -3,7 +3,7 @@
 
 using std::ofstream;
 
-constexpr int n = 200;
+constexpr int n = 400;
 
 int main()
 {
@@ -12,7 +12,7 @@ int main()
     ers.Init(1.0, 0.0, 1.0, 0.125, 0.0, 0.1); // Sod problem
     // ers.Init(1.0, 0.0, 1000.0, 1.0, 0.0, 0.01); // blast wave problem
 
-    double smax = 2.0;
+    double smax = 2;
     // double smax = 125.0 / 3.0;
 
     double s[n], d[n], u[n], p[n];
