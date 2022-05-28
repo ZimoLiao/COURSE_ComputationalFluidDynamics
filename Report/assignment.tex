@@ -604,6 +604,9 @@ WENO采用了上述子模版重构值的凸组合（convex combination）作为$
 \end{align}
 来流条件为：$Ma_\infty=3,\ T_\infty=288.16\ \mathrm{K},\ p=101.325\ \mathrm{kPa}$。此外，$H=10\ \mathrm{m}$，气体参数$R=287\ \mathrm{J/(kg\cdot K)},\ \gamma=1.4$。
 
+\subsection{2D Euler equations in general coordinates}
+由于本题压缩拐角并非简单矩形网格，需要针对一般几何做特殊处理，总的来说有三种思路：一般曲线坐标系下有限差分法，有限体积法，笛卡尔网格加浸没边界法。从技术路径考量，
+
 \subsection{Coordinate transformation}
 
 \subsection{Dimensional splitting}
