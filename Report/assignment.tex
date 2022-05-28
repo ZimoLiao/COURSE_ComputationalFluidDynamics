@@ -604,14 +604,92 @@ WENO采用了上述子模版重构值的凸组合（convex combination）作为$
 \end{align}
 来流条件为：$Ma_\infty=3,\ T_\infty=288.16\ \mathrm{K},\ p=101.325\ \mathrm{kPa}$。此外，$H=10\ \mathrm{m}$，气体参数$R=287\ \mathrm{J/(kg\cdot K)},\ \gamma=1.4$。
 
-\subsection{2D Euler equations in general coordinates}
-由于本题压缩拐角并非简单矩形网格，需要针对一般几何做特殊处理，总的来说有三种思路：一般曲线坐标系下有限差分法，有限体积法，笛卡尔网格加浸没边界法。从技术路径考量，
+\subsection{2D Euler/N-S equations in general coordinates}
+由于本题压缩拐角并非简单矩形网格，需要针对一般几何做特殊处理，总的来说有三种思路：一般曲线坐标系下有限差分法，有限体积法，笛卡尔网格加浸没边界法。从技术路径考量，第一种方法较易实现，且方便使用高阶格式，被许多面向可压缩流科学研究的开源、in-house代码采用。这里我们采用CUDA编写了一套GPU并行的二维一般曲线坐标系下N-S方程高阶有限差分求解器，若去掉粘性通量部分则转为Euler方程。
 
-\subsection{Coordinate transformation}
-
-\subsection{Dimensional splitting}
+二维一般曲线坐标系下的可压缩N-S方程如下所示：
+\begin{equation}
+	\frac{\partial \bm{U}}{\partial t}+\frac{\partial \bm{E}}{\partial \xi}+\frac{\partial \bm{F}}{\partial \eta}=\frac{Ma_\infty}{Re_\infty}\left(\frac{\partial \bm{E}_v}{\partial \xi}+\frac{\partial \bm{F}_v}{\partial \eta}\right)
+\end{equation}
+采用参考声速无量纲化\citep{ccye_gpu_2020}，无量纲参数
+\begin{equation}
+	Ma_\infty=\tilde{U}/a_\infty,\ Re_\infty=\frac{\rho_\infty a_\infty L_\infty}{\mu_\infty},\ Pr
+\end{equation}
+空气的Prandtl数取$Pr=0.72$。其中守恒变量为$\bm{U}=\frac{1}{J}\left(\rho, \rho u, \rho v, e\right)^T$，无粘与粘性通量为：
+\begin{align}
+	 & \bm{E}=\dfrac{1}{J}\left(\begin{matrix}
+			\rho U          \\
+			\rho Uu+\xi_x p \\
+			\rho Uv+\xi_y p \\
+			(e+p)U
+		\end{matrix}\right),\quad
+	\bm{E}_v=\dfrac{1}{J}\left(\begin{matrix}
+			0                             \\
+			\xi_x\tau_{xx}+\xi_y\tau_{xy} \\
+			\xi_x\tau_{xy}+\xi_y\tau_{yy} \\
+			\xi_x\beta_{x}+\xi_y\beta_{y}
+		\end{matrix}\right)        \\
+	 & \bm{F}=\dfrac{1}{J}\left(\begin{matrix}
+			\rho V           \\
+			\rho Vu+\eta_x p \\
+			\rho Vv+\eta_y p \\
+			(e+p)V
+		\end{matrix}\right),\quad
+	\bm{F}_v=\dfrac{1}{J}\left(\begin{matrix}
+			0                               \\
+			\eta_x\tau_{xx}+\eta_y\tau_{xy} \\
+			\eta_x\tau_{xy}+\eta_y\tau_{yy} \\
+			\eta_x\beta_{x}+\eta_y\beta_{y}
+		\end{matrix}\right)
+\end{align}
+其中$J$为Jacobian矩阵
+\begin{equation}
+	J=\left|\frac{\partial(\xi,\eta)}{\partial(x,y)}\right|=
+	\left|\begin{matrix}
+		\xi_x  & \xi_y  \\
+		\eta_x & \eta_y
+	\end{matrix}\right|
+\end{equation}
+$U,\ V$为逆变速度
+\begin{equation}
+	U=\xi_x u+\xi_y v,\quad V=\eta_x u+\eta_y v
+\end{equation}
+粘性通量中
+\begin{align}
+	 & \tau_{xx}=\frac{2}{3}\mu\left(2u_x-v_y\right) \\
+	 & \tau_{yy}=\frac{2}{3}\mu\left(2v_y-u_x\right) \\
+	 & \tau_{xy}=\mu\left(u_y+v_x\right)             \\
+	 & \beta_x=u\tau_{xx}+v\tau_{xy}-q_x             \\
+	 & \beta_y=u\tau_{xy}+v\tau_{yy}-q_y             \\
+\end{align}
+热流由Fourier定律给出
+\begin{equation}
+	q_x=-\frac{\mu}{Pr(\gamma-1)}\frac{\partial T}{\partial x},\quad q_y=-\frac{\mu}{Pr(\gamma-1)}\frac{\partial T}{\partial y}
+\end{equation}
+压强与分子粘性系数分别由理想气体方程和Sutherland公式给出
+\begin{equation}
+	p=(\gamma-1)\left[e-\frac{1}{2}\rho\left(u^2+v^2\right)\right],\quad \mu=T^{3/2}\frac{1+T_s/T_{ref}}{T+T_s/T_{ref}}
+\end{equation}
+其中$T_s=110.4K$为Sutherland常数，$T_{ref}$取$290K$。
 
 \subsection{Numerical methods}
+\subsubsection{Spatial discretization}
+空间离散方面，对流（无粘）通量采用上一题中所用的Steger-Warming通量矢量分解结合5阶WENO重构（在物理空间而非特征空间中重构，所以实际上会有振荡）。扩散（粘性）通量的导数采用6阶中心差分（CDS）计算（重复一阶导）。数值方法整体与OpenCFD相同。
+
+\subsubsection{Time advancing}
+时间上采用显式的3阶TVD-RK推进：
+\begin{equation}
+	\left\{\begin{array}{l}
+		U^*=U^n+\Delta t R(U^n) \\
+		U^{**}=\frac{3}{4}U^n+\frac{1}{4}U^*+\frac{1}{4}\Delta t R(U^*) \\
+		U^{n+1}=\frac{1}{3}U^n+\frac{2}{3}U^{**}+\frac{2}{3}\Delta t R(U^{**})
+	\end{array}\right.
+\end{equation}
+
+\subsubsection{Boundary conditions}
+\paragraph{出入口}
+
+\paragraph{反射壁面}
 
 \subsection{Results and discussion}
 
