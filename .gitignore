@@ -52,8 +52,8 @@ misc/*
 *.bbl
 *.blg
 *.toc
-*.png
-*.jpg
+# *.png
+# *.jpg
 *.docx
 *.doc
 
