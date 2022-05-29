@@ -43,6 +43,7 @@ misc/*
 *.ss
 *.bin
 *.gz
+*.mat
 
 # Documents
 *.aux

@@ -1,0 +1,1 @@
+[x,d,u,p,e]=loadshock([]);
