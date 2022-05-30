@@ -15,6 +15,8 @@
 \usepackage{float}
 \usepackage{booktabs}
 \usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{positioning, shapes.geometric}
 
 % global style
 \geometry{b5paper,left=0.6in,right=0.6in,top=1in,bottom=0.8in}
@@ -193,18 +195,41 @@ LSOR方法在迭代过程中，逐列（行）构造三对角矩阵隐式求解�
 \subsubsection{Multi-grid method}
 采用Fourier级数对均匀网格上误差方程进行分析，可以发现（相对网格尺寸）：误差的短波分量收敛快、长波分量收敛较慢。一般的迭代方法初始收敛快，对应误差的短波分量快速衰减，而后收敛显著减缓，对应长波分量的缓慢衰减。
 
-基于这一认识，Multi-grid采用了分而治之的思想，构造多套逐步粗化的网格，在每套网格上利用初始迭代步迅速衰减掉当前网格对应的短波分量，将误差长波分量的部分交给更粗一级的网格迭代，如此递归下去。实际求解时，由于误差在粗、细网格间传递（restriction、interpolation）时也会引入额外的误差，所以需要重复前述递归过程，直至原始网格上解的精度达到收敛准则。
+基于这一认识，Multi-grid采用了分而治之的思想，构造多套逐步粗化的网格，在每套网格上利用初始迭代步迅速衰减掉当前网格对应的短波分量，将误差长波分量的部分交给更粗一级的网格迭代，如此递归下去。实际求解时，由于误差在粗、细网格间传递（restriction、interpolation）时也会引入额外的误差，所以需要重复前述递归过程，直至原始网格上解的精度达到收敛准则。多重网格法V循环步骤如下：
+\begin{enumerate}
+	\item 初始近似$V^{M,a}$，记$m=M,\ w^m=V^{M,a},\ R^m=B^M$；
+	\item Relaxation：采用前述任一方法在当前网格上迭代人为给定的$\nu_1$步
+	      \begin{equation}
+		      w^{m,\nu_1}=Relax^{\nu_1}\left(w^m;A^m,R^m\right)
+	      \end{equation}
+	\item Restriction：采用限制算子将细网格值映射到粗网格
+	      \begin{equation}
+		      R^{m-1}=I_m^{m-1}\left(R^m-A^mw^{m,\nu_1}\right)
+	      \end{equation}
+	\item 到下一层粗网格，$m=m-1$，若$m\neq1$或未达到指定的网格层数，则重复2-4步骤，否则进入下一步；
+	\item Interpolation：采用插值算子（通常为线性插值）将粗网格值映射到细网格
+	      \begin{equation}
+		      w^{m+1}=I_m^{m+1}w^m
+	      \end{equation}
+	\item Relaxation：$m=m+1$，迭代人为给定的$\nu_2$步
+	      \begin{equation}
+		      w^{m,\nu_2}=Relax^{\nu_2}\left(w^m;A^m,R^m\right)
+	      \end{equation}
+	\item 若$m\neq M$，重复5、6步骤操作；否则得到原始网格上新的近似。
+	      \begin{equation}
+		      V^{M,a}=V^{M,a}+w^M
+	      \end{equation}
+\end{enumerate}
 
-% TODO: 流程图 tikz
 
 \subsection{Results and discussion}
-采用前述各类方法编写C++代码求解Poisson方程，网格尺寸选取为$128\times128$。其中SOR与MG-SOR方法中$\omega$选取为1.5，MG方法采用4层网格V循环，单次V循环中每层在向下、向上路径上各迭代2次。
+采用前述各类方法编写C++代码求解Poisson方程，网格尺寸选取为$128\times128$。其中SOR与MG-SOR方法中$\omega$选取为1.5，MG方法采用4层网格V循环，单次V循环中每层在向下、向上路径上各迭代2次\citep{Li96}。
 
-\autoref{fig:poisson1}与\autoref{fig:poisson2}分别展示了Jacobi、GS、LGS-Y、SOR、MG-GS、MG-SOR等方法求解前述五点离散Poisson方程边值问题的结果与残差分布。\autoref{fig:poisson_error}绘制了收敛曲线，其中Jacobi、GS、LGS-Y、SOR方法达到$10^{-6}$误差所需步数及计算耗时见\autoref{tab:poisson}。\footnote{为确保计算时间直接反应不同算法本身的效率（而非计算机底层逻辑优化的结果），编译时未开启自动优化-Ox选项。事实上，若开启编译优化指令，那么Jacobi方法将会显著快于GS、LGS-Y等方法，个人认为这是算法本身的可并行性导致的，编译器优化对于Jacobi算法会自动开启底层向量化运算，而GS、SOR、LGS-Y等方法中每步计算是具有依赖关系的，无法并行。特别的，开启优化后，MG加速方法仍然有效。}
+\autoref{fig:poisson1}与\autoref{fig:poisson2}分别展示了Jacobi、GS、LGS-Y、SOR、MG-GS、MG-SOR等方法求解前述五点离散Poisson方程边值问题的结果与残差分布。\autoref{fig:poisson_error}绘制了收敛曲线，其中Jacobi、GS、LGS-Y、SOR方法达到$10^{-6}$误差所需步数及计算耗时见\autoref{tab:poisson}。为确保计算时间直接反应不同算法本身的效率（而非计算机底层逻辑优化的结果），编译时未开启自动优化-Ox选项。事实上，若开启编译优化指令，那么Jacobi方法将会显著快于GS、LGS-Y等方法，个人认为这是算法本身的可并行性导致的，编译器优化对于Jacobi算法会自动开启底层向量化运算，而GS、SOR、LGS-Y等方法中每步计算是具有依赖关系的，无法并行。特别的，开启优化后，MG加速方法仍然有效。
 
 \begin{table}[htbp]
 	\centering
-	\caption{\label{tab:poisson}各方法求解Poisson方程迭代步数与时间。方括号中给出超松弛因子$\omega$取\citet{brazier_optimum_1974}的推荐值时SOR方法的结果；圆括号中给出了MG方法的等价迭代步数}\vspace{1ex} % TODO: 检查等效步数
+	\caption{\label{tab:poisson}各方法求解Poisson方程迭代步数与时间。方括号中给出超松弛因子$\omega$取\citet{brazier_optimum_1974}的推荐值时SOR方法的结果；圆括号中给出了MG方法的等价迭代步数}\vspace{1ex}
 	\begin{tabular}{lcccccc}
 		\toprule
 		        & Jacobi & GS    & LGS-Y & SOR           & MG-GS      & MG-SOR     \\
@@ -217,13 +242,10 @@ LSOR方法在迭代过程中，逐列（行）构造三对角矩阵隐式求解�
 
 对比各方法的测试结果，上表各方法从左至右效率逐渐提高，即达到收敛所需的迭代步数减小、计算时间减小。MG-SOR方法可以实现6倍于Jacobi方法的提速。
 
-% TODO: 比较精确解结果
-
-
-\begin{figure}[htbp] % TODO: 如果只考虑MG外层迭代步是否更直观
+\begin{figure}[htbp]
 	\centering
-	\subfigure[常规迭代方法]{\includegraphics[width=.8\linewidth]{figure/poisson/error.png}}
-	\subfigure[多重网格加速方法（含粗网格迭代）]{\includegraphics[width=.8\linewidth]{figure/poisson/error-MG.png}}
+	\subfigure[常规迭代方法]{\includegraphics[width=.7\linewidth]{figure/poisson/error.png}}
+	\subfigure[多重网格加速方法（含粗网格迭代）]{\includegraphics[width=.7\linewidth]{figure/poisson/error-MG.png}}
 	\caption{\label{fig:poisson_error}误差随迭代步的收敛曲线}
 \end{figure}
 
@@ -455,7 +477,56 @@ Van Leer在构造通量分裂时额外增加了两项条件：
 \subsubsection{Roe-Pike method}
 不同于近似状态黎曼求解器近似行波类型，HLL/HLLC黎曼求解器近似解的结构，Roe方法的思路在于直接将系统方程（非线性双曲守恒律）做线性近似，进而得到边界上通量的表达式（无需判断波的类型或速度），因此Roe方法在CFD等领域取得了广泛的应用。
 
-原始Roe方法需要构造平均Jacobian矩阵，事实上该构造过程是没有必要的，Roe，Pike提出了另一种实现方法，避免了矩阵运算。
+原始Roe方法需要构造平均Jacobian矩阵，事实上该构造过程是没有必要的，Roe和Pike提出了另一种实现方法，避免了矩阵运算。
+
+Roe-Pike方法的计算步骤如下：
+\begin{enumerate}
+	\item 根据下式计算cell boundary上的Roe平均：
+	      \begin{equation}
+		      \left.\begin{array}{l}
+			      \tilde{\rho}=\sqrt{\rho_L\rho_R}                                                                  \\[8pt]
+			      \tilde{u}=\dfrac{\sqrt{\rho_L}u_L+\sqrt{\rho_R}u_R}{\sqrt{\rho_L}+\sqrt{\rho_R}}                  \\[8pt]
+			      \tilde{H}=\dfrac{\sqrt{\rho_L}H_L+\sqrt{\rho_R}H_R}{\sqrt{\rho_L}+\sqrt{\rho_R}}                  \\[8pt]
+			      \tilde{a}=\left[(\gamma-1)\left(\tilde{H}-\frac{1}{2}\tilde{\bm{V}}^2\right)\right]^{\frac{1}{2}} \\
+		      \end{array}\right\}
+	      \end{equation}
+	      其中$\tilde{\bm{V}}^2=u^2$，$H=(E+p)/\rho$为比总焓。
+	\item 基于Roe平均量计算特征值：
+	      \begin{equation}
+		      \lambda_1=u-a,\quad\lambda_2=u,\quad\lambda_3=u+a
+	      \end{equation}
+	\item 基于Roe平均量计算特征向量：
+	      \begin{equation}
+		      \bm{K}^{(1)}=\left[\begin{matrix}
+				      1   \\
+				      u-a \\
+				      H-ua
+			      \end{matrix}\right],\quad
+		      \bm{K}^{(2)}=\left[\begin{matrix}
+				      1 \\
+				      u \\
+				      \frac{1}{2}V^2
+			      \end{matrix}\right],\quad
+		      \bm{K}^{(3)}=\left[\begin{matrix}
+				      1   \\
+				      u+a \\
+				      H+ua
+			      \end{matrix}\right],\quad
+	      \end{equation}
+	\item 基于Roe平均量计算波强：
+	      \begin{equation}
+		      \left.\begin{array}{l}
+			      \alpha_1=\frac{1}{2a^2}\left(\Delta p-\rho a\Delta u\right) \\
+			      \alpha_2=\Delta\rho-\Delta p/a^2                            \\
+			      \alpha_3=\frac{1}{2a^2}\left(\Delta p+\rho a\Delta u\right)
+		      \end{array}\right\}
+	      \end{equation}
+	      其中$\Delta f\equiv f_R-f_L$。
+	\item 将前述结果代入以下表达式计算数值通量：
+	      \begin{equation}
+		      \bm{F}_{i+\frac{1}{2}}=\frac{1}{2}\left(\bm{F}_L+\bm{F}_R\right)-\frac{1}{2}\sum_{i=1}\tilde{\alpha}_i|\tilde{\lambda}_i|\tilde{\bm{K}}^{(i)}
+	      \end{equation}
+\end{enumerate}
 
 \subsection{High order methods}
 前文介绍的方法仅告诉我们如何确定信息传播方向，避免间断附近的非物理振荡，插值过程直接采用一阶精度迎风格式。但在实际可压缩流动数值模拟中，我们还需要通过提高插值格式的阶数来提高离散解的精度，对于存在间断的流场，插值格式也需要特殊的构造以实现“激波捕捉”这一特性。
@@ -641,7 +712,7 @@ WENO采用了上述子模版重构值的凸组合（convex combination）作为$
 \begin{equation}
 	\frac{\partial \bm{U}}{\partial t}+\frac{\partial \bm{E}}{\partial \xi}+\frac{\partial \bm{F}}{\partial \eta}=\frac{Ma_\infty}{Re_\infty}\left(\frac{\partial \bm{E}_v}{\partial \xi}+\frac{\partial \bm{F}_v}{\partial \eta}\right)
 \end{equation}
-采用参考声速无量纲化\citep{ccye_gpu_2020}，无量纲参数
+采用参考声速无量纲化\citep{_gpu_2020}，无量纲参数
 \begin{equation}
 	Ma_\infty=\tilde{U}/a_\infty,\ Re_\infty=\frac{\rho_\infty a_\infty L_\infty}{\mu_\infty},\ Pr
 \end{equation}
@@ -754,19 +825,19 @@ $U,\ V$为逆变速度
 
 \begin{figure}[htbp]
 	\centering
-	\subfigure[$\rho$]{\includegraphics[width=.24\linewidth]{figure/ramp/g256/d_line.png}}
-	\subfigure[$Ma$]{\includegraphics[width=.24\linewidth]{figure/ramp/g256/Ma_line.png}}
-	\subfigure[$p$]{\includegraphics[width=.24\linewidth]{figure/ramp/g256/p_line.png}}
-	\subfigure[$T$]{\includegraphics[width=.24\linewidth]{figure/ramp/g256/T_line.png}}
+	\subfigure[$\rho$]{\includegraphics[width=.35\linewidth]{figure/ramp/g256/d_line.png}}
+	\subfigure[$Ma$]{\includegraphics[width=.35\linewidth]{figure/ramp/g256/Ma_line.png}}
+	\subfigure[$p$]{\includegraphics[width=.35\linewidth]{figure/ramp/g256/p_line.png}}
+	\subfigure[$T$]{\includegraphics[width=.35\linewidth]{figure/ramp/g256/T_line.png}}
 	\caption{\label{fig:ramp256line}$384\times256$网格下压缩拐角计算结果（$y=10$上变量分布），实线为精确解，虚线为数值解}
 \end{figure}
 
 \begin{figure}[htbp]
 	\centering
-	\subfigure[$\rho$]{\includegraphics[width=.45\linewidth]{figure/ramp/g256/d.png}}
-	\subfigure[$Ma$]{\includegraphics[width=.45\linewidth]{figure/ramp/g256/Ma.png}}
-	\subfigure[$p$]{\includegraphics[width=.45\linewidth]{figure/ramp/g256/p.png}}
-	\subfigure[$|\nabla\rho|$]{\includegraphics[width=.45\linewidth]{figure/ramp/g256/schlieren.png}}
+	\subfigure[$\rho$]{\includegraphics[width=.35\linewidth]{figure/ramp/g256/d.png}}
+	\subfigure[$Ma$]{\includegraphics[width=.35\linewidth]{figure/ramp/g256/Ma.png}}
+	\subfigure[$p$]{\includegraphics[width=.35\linewidth]{figure/ramp/g256/p.png}}
+	\subfigure[$|\nabla\rho|$]{\includegraphics[width=.35\linewidth]{figure/ramp/g256/schlieren.png}}
 	\caption{\label{fig:ramp256}$384\times256$网格下压缩拐角计算结果}
 \end{figure}
 
